@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS sys_user (
+    id         BIGINT       NOT NULL AUTO_INCREMENT,
+    phone      VARCHAR(20)  NOT NULL,
+    password   VARCHAR(100) NOT NULL,
+    nickname   VARCHAR(50)  DEFAULT NULL,
+    avatar     VARCHAR(255) DEFAULT NULL,
+    role       VARCHAR(20)  NOT NULL DEFAULT 'USER',
+    status     TINYINT      NOT NULL DEFAULT 1 COMMENT '1=正常 0=禁用',
+    created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted    TINYINT      NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_phone (phone)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

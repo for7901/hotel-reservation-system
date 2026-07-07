@@ -1,0 +1,8 @@
+package daydream.hotel.reservation.system.hotel.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import daydream.hotel.reservation.system.hotel.entity.Hotel;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface HotelMapper extends BaseMapper<Hotel> {}
