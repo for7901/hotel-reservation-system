@@ -17,6 +17,8 @@ public class HotelReview {
     private String userNickname;
     private Integer rating;
     private String content;
+    private String merchantReply;
+    private LocalDateTime replyAt;
     private Integer status;
     private LocalDateTime createdAt;
 
@@ -74,6 +76,22 @@ public class HotelReview {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getMerchantReply() {
+        return merchantReply;
+    }
+
+    public void setMerchantReply(String merchantReply) {
+        this.merchantReply = merchantReply;
+    }
+
+    public LocalDateTime getReplyAt() {
+        return replyAt;
+    }
+
+    public void setReplyAt(LocalDateTime replyAt) {
+        this.replyAt = replyAt;
     }
 
     public Integer getStatus() {

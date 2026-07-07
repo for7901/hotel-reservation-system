@@ -37,6 +37,7 @@ const router = createRouter({
         { path: 'orders', name: 'orders', component: () => import('@/views/order/OrderListView.vue') },
         { path: 'users', name: 'users', component: () => import('@/views/user/UserListView.vue'), meta: { roles: ['ADMIN'] } },
         { path: 'reviews', name: 'reviews', component: () => import('@/views/review/ReviewListView.vue'), meta: { roles: ['ADMIN'] } },
+        { path: 'merchant-reviews', name: 'merchant-reviews', component: () => import('@/views/review/MerchantReviewListView.vue'), meta: { roles: ['MERCHANT'] } },
         { path: 'banners', name: 'banners', component: () => import('@/views/banner/BannerListView.vue'), meta: { roles: ['ADMIN'] } },
         { path: 'coupons', name: 'coupons', component: () => import('@/views/coupon/CouponListView.vue'), meta: { roles: ['ADMIN'] } },
         { path: 'audit-logs', name: 'audit-logs', component: () => import('@/views/audit/AuditLogListView.vue'), meta: { roles: ['ADMIN'] } },

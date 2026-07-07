@@ -38,7 +38,7 @@ public class RedisCacheService implements CacheService {
         }
 
         T value = loader.get();
-        if (value != null) {
+        if (shouldCache(value)) {
             try {
                 redisTemplate
                         .get()
@@ -54,8 +54,29 @@ public class RedisCacheService implements CacheService {
         return value;
     }
 
+    private boolean shouldCache(Object value) {
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof java.util.Collection<?> collection) {
+            return !collection.isEmpty();
+        }
+        return true;
+    }
+
     @Override
     public void evict(String key) {
         redisTemplate.ifPresent(template -> template.delete(key));
+    }
+
+    @Override
+    public void evictByPrefix(String prefix) {
+        redisTemplate.ifPresent(
+                template -> {
+                    var keys = template.keys(prefix + "*");
+                    if (keys != null && !keys.isEmpty()) {
+                        template.delete(keys);
+                    }
+                });
     }
 }

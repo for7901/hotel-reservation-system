@@ -6,6 +6,8 @@ export interface Review {
   userNickname: string
   rating: number
   content: string
+  merchantReply?: string | null
+  replyAt?: string | null
   createdAt: string
 }
 

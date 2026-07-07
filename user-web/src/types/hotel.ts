@@ -1,5 +1,12 @@
+export interface Province {
+  id: number
+  name: string
+  code: string
+}
+
 export interface City {
   id: number
+  provinceId: number
   name: string
   code: string
 }

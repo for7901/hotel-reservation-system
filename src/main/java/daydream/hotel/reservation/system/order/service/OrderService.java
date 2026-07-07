@@ -17,10 +17,14 @@ import daydream.hotel.reservation.system.hotel.mapper.HotelMapper;
 import daydream.hotel.reservation.system.hotel.mapper.RoomTypeMapper;
 import daydream.hotel.reservation.system.inventory.service.InventoryService;
 import daydream.hotel.reservation.system.order.dto.CreateOrderRequest;
+import daydream.hotel.reservation.system.order.dto.OrderGuestRequest;
+import daydream.hotel.reservation.system.order.dto.OrderGuestVO;
 import daydream.hotel.reservation.system.order.dto.OrderVO;
 import daydream.hotel.reservation.system.order.entity.HotelOrder;
+import daydream.hotel.reservation.system.order.entity.OrderGuest;
 import daydream.hotel.reservation.system.order.enums.OrderStatus;
 import daydream.hotel.reservation.system.order.mapper.HotelOrderMapper;
+import daydream.hotel.reservation.system.order.mapper.OrderGuestMapper;
 import daydream.hotel.reservation.system.user.enums.UserRole;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -39,6 +43,7 @@ public class OrderService {
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
     private final HotelOrderMapper orderMapper;
+    private final OrderGuestMapper orderGuestMapper;
     private final HotelMapper hotelMapper;
     private final RoomTypeMapper roomTypeMapper;
     private final InventoryService inventoryService;
@@ -48,6 +53,7 @@ public class OrderService {
 
     public OrderService(
             HotelOrderMapper orderMapper,
+            OrderGuestMapper orderGuestMapper,
             HotelMapper hotelMapper,
             RoomTypeMapper roomTypeMapper,
             InventoryService inventoryService,
@@ -55,6 +61,7 @@ public class OrderService {
             AppProperties appProperties,
             TransactionTemplate transactionTemplate) {
         this.orderMapper = orderMapper;
+        this.orderGuestMapper = orderGuestMapper;
         this.hotelMapper = hotelMapper;
         this.roomTypeMapper = roomTypeMapper;
         this.inventoryService = inventoryService;
@@ -69,6 +76,7 @@ public class OrderService {
         if (!request.getCheckInDate().isBefore(request.getCheckOutDate())) {
             throw new BusinessException(ErrorCode.INVALID_DATE_RANGE);
         }
+        validateGuestInfo(request);
 
         Hotel hotel = hotelMapper.selectById(request.getHotelId());
         if (hotel == null || !HotelStatus.APPROVED.name().equals(hotel.getStatus())) {
@@ -84,6 +92,9 @@ public class OrderService {
         if (roomType == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
+        if (request.getGuestCount() > roomType.getMaxGuests()) {
+            throw new BusinessException(ErrorCode.GUEST_COUNT_EXCEEDED);
+        }
 
         InventoryService.PriceSummary priceSummary =
                 inventoryService.calculatePrice(
@@ -95,6 +106,8 @@ public class OrderService {
                 couponService.applyDiscount(
                         request.getUserCouponId(), userId, priceSummary.totalPrice());
 
+        OrderGuestRequest primaryGuest = request.getGuests().get(0);
+
         HotelOrder order = new HotelOrder();
         order.setOrderNo(generateOrderNo());
         order.setUserId(userId);
@@ -105,14 +118,16 @@ public class OrderService {
         order.setCheckInDate(request.getCheckInDate());
         order.setCheckOutDate(request.getCheckOutDate());
         order.setNights(priceSummary.nights());
-        order.setGuestName(request.getGuestName());
-        order.setGuestPhone(request.getGuestPhone());
+        order.setGuestCount(request.getGuestCount());
+        order.setGuestName(primaryGuest.getName());
+        order.setGuestPhone(primaryGuest.getPhone());
         order.setUnitPrice(priceSummary.unitPrice());
         order.setDiscountAmount(discount.discountAmount());
         order.setCouponId(discount.userCouponId());
         order.setTotalAmount(discount.payAmount());
         order.setStatus(OrderStatus.PENDING_PAYMENT.name());
         orderMapper.insert(order);
+        saveOrderGuests(order.getId(), request.getGuests());
         return toVO(order);
     }
 
@@ -122,8 +137,110 @@ public class OrderService {
         if (!OrderStatus.canPay(order.getStatus())) {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
         }
-        order.setStatus(OrderStatus.CONFIRMED.name());
+        order.setStatus(OrderStatus.PAID.name());
         order.setPaidAt(LocalDateTime.now());
+        orderMapper.updateById(order);
+        return toVO(order);
+    }
+
+    @Transactional
+    public OrderVO approveGuestReview(Long orderId) {
+        HotelOrder order = getMerchantOrder(orderId);
+        if (!OrderStatus.canReviewGuests(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+        order.setStatus(OrderStatus.CONFIRMED.name());
+        order.setRejectReason(null);
+        orderMapper.updateById(order);
+        return toVO(order);
+    }
+
+    @Transactional
+    public OrderVO rejectGuestReview(Long orderId, String reason) {
+        HotelOrder order = getMerchantOrder(orderId);
+        if (!OrderStatus.canReviewGuests(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+        inventoryService.releaseInventory(
+                order.getRoomTypeId(), order.getCheckInDate(), order.getCheckOutDate());
+        couponService.releaseCoupon(order.getCouponId());
+        order.setStatus(OrderStatus.REFUNDED.name());
+        order.setRejectReason(reason.trim());
+        order.setCancelledAt(LocalDateTime.now());
+        orderMapper.updateById(order);
+        return toVO(order);
+    }
+
+    @Transactional
+    public OrderVO applyCheckout(Long orderId) {
+        HotelOrder order = getUserOrder(orderId);
+        if (!OrderStatus.canApplyCheckout(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        CheckoutRefundCalculator.CheckoutRefundResult refundResult =
+                CheckoutRefundCalculator.calculate(
+                        order.getTotalAmount(),
+                        order.getCheckInDate(),
+                        order.getCheckOutDate(),
+                        order.getNights(),
+                        now);
+        if (refundResult.refundableNights() <= 0
+                || refundResult.refundAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST.getCode(), refundResult.policy());
+        }
+        order.setStatus(OrderStatus.CHECKOUT_PENDING.name());
+        order.setCheckoutApplyAt(now);
+        order.setRefundAmount(refundResult.refundAmount());
+        order.setRefundPolicy(refundResult.policy());
+        order.setRejectReason(null);
+        orderMapper.updateById(order);
+        return toVO(order);
+    }
+
+    @Transactional
+    public OrderVO approveCheckout(Long orderId) {
+        HotelOrder order = getMerchantOrder(orderId);
+        if (!OrderStatus.canApproveCheckout(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+        CheckoutRefundCalculator.CheckoutRefundResult refundResult =
+                CheckoutRefundCalculator.calculate(
+                        order.getTotalAmount(),
+                        order.getCheckInDate(),
+                        order.getCheckOutDate(),
+                        order.getNights(),
+                        order.getCheckoutApplyAt() != null
+                                ? order.getCheckoutApplyAt()
+                                : LocalDateTime.now());
+        if (refundResult.refundFromDate() != null) {
+            inventoryService.releaseInventory(
+                    order.getRoomTypeId(),
+                    refundResult.refundFromDate(),
+                    order.getCheckOutDate());
+        }
+        if (refundResult.refundAmount().compareTo(order.getTotalAmount()) >= 0) {
+            couponService.releaseCoupon(order.getCouponId());
+        }
+        order.setStatus(OrderStatus.REFUNDED.name());
+        order.setRefundAmount(refundResult.refundAmount());
+        order.setRefundPolicy(refundResult.policy());
+        order.setCancelledAt(LocalDateTime.now());
+        orderMapper.updateById(order);
+        return toVO(order);
+    }
+
+    @Transactional
+    public OrderVO rejectCheckout(Long orderId, String reason) {
+        HotelOrder order = getMerchantOrder(orderId);
+        if (!OrderStatus.canApproveCheckout(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+        order.setStatus(OrderStatus.CONFIRMED.name());
+        order.setCheckoutApplyAt(null);
+        order.setRefundAmount(null);
+        order.setRefundPolicy(null);
+        order.setRejectReason(reason.trim());
         orderMapper.updateById(order);
         return toVO(order);
     }
@@ -239,6 +356,32 @@ public class OrderService {
         return toPage(orderPage);
     }
 
+    private void validateGuestInfo(CreateOrderRequest request) {
+        if (!request.getGuestCount().equals(request.getGuests().size())) {
+            throw new BusinessException(ErrorCode.GUEST_INFO_MISMATCH);
+        }
+        List<OrderGuestRequest> guests = request.getGuests();
+        for (OrderGuestRequest guest : guests) {
+            if (StringUtils.hasText(guest.getIdCard())
+                    && !guest.getIdCard().matches("^\\d{17}[\\dXx]$")) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST);
+            }
+        }
+    }
+
+    private void saveOrderGuests(Long orderId, List<OrderGuestRequest> guests) {
+        for (int i = 0; i < guests.size(); i++) {
+            OrderGuestRequest guest = guests.get(i);
+            OrderGuest entity = new OrderGuest();
+            entity.setOrderId(orderId);
+            entity.setName(guest.getName().trim());
+            entity.setPhone(guest.getPhone());
+            entity.setIdCard(StringUtils.hasText(guest.getIdCard()) ? guest.getIdCard().trim() : null);
+            entity.setSortOrder(i);
+            orderGuestMapper.insert(entity);
+        }
+    }
+
     private LambdaQueryWrapper<HotelOrder> buildOrderQuery(
             List<Long> hotelIds, String status, String keyword) {
         LambdaQueryWrapper<HotelOrder> wrapper =
@@ -265,6 +408,19 @@ public class OrderService {
             throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
         if (!order.getUserId().equals(SecurityUtils.getCurrentUserId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        return order;
+    }
+
+    private HotelOrder getMerchantOrder(Long orderId) {
+        HotelOrder order = getAccessibleOrder(orderId);
+        LoginUser loginUser = SecurityUtils.getLoginUser();
+        if (!UserRole.MERCHANT.name().equals(loginUser.getRole())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        Hotel hotel = hotelMapper.selectById(order.getHotelId());
+        if (hotel == null || !hotel.getMerchantId().equals(loginUser.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
         return order;
@@ -314,6 +470,7 @@ public class OrderService {
         vo.setCheckInDate(order.getCheckInDate());
         vo.setCheckOutDate(order.getCheckOutDate());
         vo.setNights(order.getNights());
+        vo.setGuestCount(order.getGuestCount());
         vo.setGuestName(order.getGuestName());
         vo.setGuestPhone(SensitiveUtils.maskPhone(order.getGuestPhone()));
         vo.setUnitPrice(order.getUnitPrice());
@@ -321,9 +478,35 @@ public class OrderService {
                 order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO);
         vo.setTotalAmount(order.getTotalAmount());
         vo.setStatus(order.getStatus());
+        vo.setRejectReason(order.getRejectReason());
         vo.setPaidAt(order.getPaidAt());
         vo.setCancelledAt(order.getCancelledAt());
+        vo.setCheckoutApplyAt(order.getCheckoutApplyAt());
+        vo.setRefundAmount(order.getRefundAmount());
+        vo.setRefundPolicy(order.getRefundPolicy());
         vo.setCreatedAt(order.getCreatedAt());
+        vo.setGuests(loadGuestVOs(order.getId()));
+        return vo;
+    }
+
+    private List<OrderGuestVO> loadGuestVOs(Long orderId) {
+        return orderGuestMapper
+                .selectList(
+                        new LambdaQueryWrapper<OrderGuest>()
+                                .eq(OrderGuest::getOrderId, orderId)
+                                .orderByAsc(OrderGuest::getSortOrder))
+                .stream()
+                .map(this::toGuestVO)
+                .toList();
+    }
+
+    private OrderGuestVO toGuestVO(OrderGuest guest) {
+        OrderGuestVO vo = new OrderGuestVO();
+        vo.setId(guest.getId());
+        vo.setName(guest.getName());
+        vo.setPhone(SensitiveUtils.maskPhone(guest.getPhone()));
+        vo.setIdCard(guest.getIdCard());
+        vo.setSortOrder(guest.getSortOrder());
         return vo;
     }
 }

@@ -5,6 +5,7 @@ public enum OrderStatus {
     PAID,
     CONFIRMED,
     CHECKED_IN,
+    CHECKOUT_PENDING,
     COMPLETED,
     CANCELLED,
     REFUNDING,
@@ -15,12 +16,22 @@ public enum OrderStatus {
     }
 
     public static boolean canCancel(String status) {
-        return PENDING_PAYMENT.name().equals(status)
-                || PAID.name().equals(status)
-                || CONFIRMED.name().equals(status);
+        return PENDING_PAYMENT.name().equals(status);
+    }
+
+    public static boolean canApplyCheckout(String status) {
+        return CONFIRMED.name().equals(status);
+    }
+
+    public static boolean canApproveCheckout(String status) {
+        return CHECKOUT_PENDING.name().equals(status);
     }
 
     public static boolean canComplete(String status) {
         return CONFIRMED.name().equals(status);
+    }
+
+    public static boolean canReviewGuests(String status) {
+        return PAID.name().equals(status);
     }
 }

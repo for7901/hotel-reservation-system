@@ -18,12 +18,16 @@ import daydream.hotel.reservation.system.hotel.mapper.HotelMapper;
 import daydream.hotel.reservation.system.hotel.mapper.RoomTypeMapper;
 import daydream.hotel.reservation.system.inventory.service.InventoryService;
 import daydream.hotel.reservation.system.order.dto.CreateOrderRequest;
+import daydream.hotel.reservation.system.order.dto.OrderGuestRequest;
 import daydream.hotel.reservation.system.order.dto.OrderVO;
 import daydream.hotel.reservation.system.order.entity.HotelOrder;
+import daydream.hotel.reservation.system.order.entity.OrderGuest;
 import daydream.hotel.reservation.system.order.enums.OrderStatus;
 import daydream.hotel.reservation.system.order.mapper.HotelOrderMapper;
+import daydream.hotel.reservation.system.order.mapper.OrderGuestMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +44,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 class OrderServiceTest {
 
     @Mock private HotelOrderMapper orderMapper;
+
+    @Mock private OrderGuestMapper orderGuestMapper;
 
     @Mock private HotelMapper hotelMapper;
 
@@ -68,13 +74,17 @@ class OrderServiceTest {
                                 null,
                                 null));
 
+        OrderGuestRequest guest = new OrderGuestRequest();
+        guest.setName("张三");
+        guest.setPhone("13900001111");
+
         request = new CreateOrderRequest();
         request.setHotelId(1L);
         request.setRoomTypeId(2L);
         request.setCheckInDate(LocalDate.now().plusDays(1));
         request.setCheckOutDate(LocalDate.now().plusDays(2));
-        request.setGuestName("张三");
-        request.setGuestPhone("13900001111");
+        request.setGuestCount(1);
+        request.setGuests(List.of(guest));
 
         hotel = new Hotel();
         hotel.setId(1L);
@@ -85,6 +95,7 @@ class OrderServiceTest {
         roomType.setId(2L);
         roomType.setHotelId(1L);
         roomType.setName("大床房");
+        roomType.setMaxGuests(2);
     }
 
     @AfterEach
@@ -109,16 +120,35 @@ class OrderServiceTest {
 
         verify(inventoryService)
                 .reserveInventory(2L, request.getCheckInDate(), request.getCheckOutDate());
+        verify(orderGuestMapper).insert(org.mockito.ArgumentMatchers.<OrderGuest>any());
 
         ArgumentCaptor<HotelOrder> captor = ArgumentCaptor.forClass(HotelOrder.class);
         verify(orderMapper).insert(captor.capture());
         HotelOrder saved = captor.getValue();
         assertEquals(100L, saved.getUserId());
+        assertEquals(1, saved.getGuestCount());
         assertEquals(OrderStatus.PENDING_PAYMENT.name(), saved.getStatus());
         assertEquals(0, saved.getTotalAmount().compareTo(new BigDecimal("299.00")));
 
         assertNotNull(vo.getOrderNo());
         assertEquals(OrderStatus.PENDING_PAYMENT.name(), vo.getStatus());
+    }
+
+    @Test
+    void createOrderShouldRejectGuestCountExceedingMaxGuests() {
+        request.setGuestCount(3);
+        OrderGuestRequest guest2 = new OrderGuestRequest();
+        guest2.setName("李四");
+        guest2.setPhone("13900002222");
+        OrderGuestRequest guest3 = new OrderGuestRequest();
+        guest3.setName("王五");
+        guest3.setPhone("13900003333");
+        request.setGuests(List.of(request.getGuests().get(0), guest2, guest3));
+
+        when(hotelMapper.selectById(1L)).thenReturn(hotel);
+        when(roomTypeMapper.selectOne(any())).thenReturn(roomType);
+
+        assertThrows(BusinessException.class, () -> orderService.createOrder(request));
     }
 
     @Test

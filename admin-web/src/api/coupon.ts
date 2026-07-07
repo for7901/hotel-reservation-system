@@ -29,3 +29,7 @@ export function fetchCoupons(): Promise<Coupon[]> {
 export function createCoupon(data: CouponSaveRequest): Promise<Coupon> {
   return request.post('/admin/coupons', data) as Promise<Coupon>
 }
+
+export function updateCouponStatus(id: number, status: number): Promise<Coupon> {
+  return request.put(`/admin/coupons/${id}/status`, { status }) as Promise<Coupon>
+}

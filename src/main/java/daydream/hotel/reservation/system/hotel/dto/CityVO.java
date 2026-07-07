@@ -3,6 +3,7 @@ package daydream.hotel.reservation.system.hotel.dto;
 public class CityVO {
 
     private Long id;
+    private Long provinceId;
     private String name;
     private String code;
 
@@ -12,6 +13,14 @@ public class CityVO {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Long getProvinceId() {
+        return provinceId;
+    }
+
+    public void setProvinceId(Long provinceId) {
+        this.provinceId = provinceId;
     }
 
     public String getName() {

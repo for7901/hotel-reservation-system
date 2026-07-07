@@ -60,6 +60,12 @@ public class OrderController {
         return Result.ok(orderService.cancelOrder(id));
     }
 
+    @Operation(summary = "申请退房")
+    @PostMapping("/{id}/apply-checkout")
+    public Result<OrderVO> applyCheckout(@PathVariable Long id) {
+        return Result.ok(orderService.applyCheckout(id));
+    }
+
     @Operation(summary = "确认完成")
     @PostMapping("/{id}/complete")
     public Result<OrderVO> complete(@PathVariable Long id) {

@@ -117,11 +117,14 @@ async function toggleFavorite() {
         </van-cell>
       </van-cell-group>
       <van-cell-group inset title="住客评价">
-        <van-cell v-for="r in reviews" :key="r.id" :title="r.userNickname || '匿名用户'" :label="r.content || '暂无文字评价'">
-          <template #value>
-            <van-rate :model-value="r.rating" readonly size="14" />
-          </template>
-        </van-cell>
+        <div v-for="r in reviews" :key="r.id" class="review-item">
+          <van-cell :title="r.userNickname || '匿名用户'" :label="r.content || '暂无文字评价'">
+            <template #value>
+              <van-rate :model-value="r.rating" readonly size="14" />
+            </template>
+          </van-cell>
+          <div v-if="r.merchantReply" class="merchant-reply">商家回复：{{ r.merchantReply }}</div>
+        </div>
         <van-empty v-if="reviews.length === 0" description="暂无评价" image-size="60" />
       </van-cell-group>
       <div class="footer">
@@ -177,6 +180,19 @@ async function toggleFavorite() {
 .room-price {
   color: #ee0a24;
   font-weight: 600;
+}
+
+.review-item + .review-item {
+  border-top: 1px solid #f2f3f5;
+}
+
+.merchant-reply {
+  margin: 0 16px 12px;
+  padding: 8px 12px;
+  background: #f7f8fa;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #646566;
 }
 
 .footer {

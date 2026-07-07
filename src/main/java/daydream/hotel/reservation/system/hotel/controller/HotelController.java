@@ -5,6 +5,7 @@ import daydream.hotel.reservation.system.common.result.Result;
 import daydream.hotel.reservation.system.hotel.dto.CityVO;
 import daydream.hotel.reservation.system.hotel.dto.HotelDetailVO;
 import daydream.hotel.reservation.system.hotel.dto.HotelListItemVO;
+import daydream.hotel.reservation.system.hotel.dto.ProvinceVO;
 import daydream.hotel.reservation.system.hotel.service.HotelService;
 import daydream.hotel.reservation.system.inventory.dto.AvailabilityVO;
 import daydream.hotel.reservation.system.inventory.service.InventoryService;
@@ -32,15 +33,22 @@ public class HotelController {
         this.inventoryService = inventoryService;
     }
 
+    @Operation(summary = "省份列表")
+    @GetMapping("/provinces")
+    public Result<List<ProvinceVO>> listProvinces() {
+        return Result.ok(hotelService.listProvinces());
+    }
+
     @Operation(summary = "城市列表")
     @GetMapping("/cities")
-    public Result<List<CityVO>> listCities() {
-        return Result.ok(hotelService.listCities());
+    public Result<List<CityVO>> listCities(@RequestParam(required = false) Long provinceId) {
+        return Result.ok(hotelService.listCities(provinceId));
     }
 
     @Operation(summary = "搜索酒店")
     @GetMapping("/search")
     public Result<PageResult<HotelListItemVO>> search(
+            @RequestParam(required = false) Long provinceId,
             @RequestParam(required = false) Long cityId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Integer starRating,
@@ -52,6 +60,7 @@ public class HotelController {
             @RequestParam(defaultValue = "10") long size) {
         return Result.ok(
                 hotelService.searchHotels(
+                        provinceId,
                         cityId,
                         keyword,
                         starRating,

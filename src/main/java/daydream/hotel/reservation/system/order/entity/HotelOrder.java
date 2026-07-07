@@ -22,6 +22,7 @@ public class HotelOrder {
     private LocalDate checkInDate;
     private LocalDate checkOutDate;
     private Integer nights;
+    private Integer guestCount;
     private String guestName;
     private String guestPhone;
     private BigDecimal unitPrice;
@@ -29,8 +30,12 @@ public class HotelOrder {
     private Long couponId;
     private BigDecimal discountAmount;
     private String status;
+    private String rejectReason;
     private LocalDateTime paidAt;
     private LocalDateTime cancelledAt;
+    private LocalDateTime checkoutApplyAt;
+    private BigDecimal refundAmount;
+    private String refundPolicy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -114,6 +119,14 @@ public class HotelOrder {
         this.nights = nights;
     }
 
+    public Integer getGuestCount() {
+        return guestCount;
+    }
+
+    public void setGuestCount(Integer guestCount) {
+        this.guestCount = guestCount;
+    }
+
     public String getGuestName() {
         return guestName;
     }
@@ -170,6 +183,14 @@ public class HotelOrder {
         this.status = status;
     }
 
+    public String getRejectReason() {
+        return rejectReason;
+    }
+
+    public void setRejectReason(String rejectReason) {
+        this.rejectReason = rejectReason;
+    }
+
     public LocalDateTime getPaidAt() {
         return paidAt;
     }
@@ -184,6 +205,30 @@ public class HotelOrder {
 
     public void setCancelledAt(LocalDateTime cancelledAt) {
         this.cancelledAt = cancelledAt;
+    }
+
+    public LocalDateTime getCheckoutApplyAt() {
+        return checkoutApplyAt;
+    }
+
+    public void setCheckoutApplyAt(LocalDateTime checkoutApplyAt) {
+        this.checkoutApplyAt = checkoutApplyAt;
+    }
+
+    public BigDecimal getRefundAmount() {
+        return refundAmount;
+    }
+
+    public void setRefundAmount(BigDecimal refundAmount) {
+        this.refundAmount = refundAmount;
+    }
+
+    public String getRefundPolicy() {
+        return refundPolicy;
+    }
+
+    public void setRefundPolicy(String refundPolicy) {
+        this.refundPolicy = refundPolicy;
     }
 
     public LocalDateTime getCreatedAt() {

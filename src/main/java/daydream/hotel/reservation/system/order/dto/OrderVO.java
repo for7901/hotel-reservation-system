@@ -4,6 +4,7 @@ import daydream.hotel.reservation.system.common.jackson.MaskPhone;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class OrderVO {
 
@@ -16,15 +17,21 @@ public class OrderVO {
     private LocalDate checkInDate;
     private LocalDate checkOutDate;
     private Integer nights;
+    private Integer guestCount;
     private String guestName;
     private String guestPhone;
     private BigDecimal unitPrice;
     private BigDecimal totalAmount;
     private BigDecimal discountAmount;
     private String status;
+    private String rejectReason;
     private LocalDateTime paidAt;
     private LocalDateTime cancelledAt;
+    private LocalDateTime checkoutApplyAt;
+    private BigDecimal refundAmount;
+    private String refundPolicy;
     private LocalDateTime createdAt;
+    private List<OrderGuestVO> guests;
 
     public Long getId() {
         return id;
@@ -98,6 +105,14 @@ public class OrderVO {
         this.nights = nights;
     }
 
+    public Integer getGuestCount() {
+        return guestCount;
+    }
+
+    public void setGuestCount(Integer guestCount) {
+        this.guestCount = guestCount;
+    }
+
     public String getGuestName() {
         return guestName;
     }
@@ -147,6 +162,14 @@ public class OrderVO {
         this.status = status;
     }
 
+    public String getRejectReason() {
+        return rejectReason;
+    }
+
+    public void setRejectReason(String rejectReason) {
+        this.rejectReason = rejectReason;
+    }
+
     public LocalDateTime getPaidAt() {
         return paidAt;
     }
@@ -163,11 +186,43 @@ public class OrderVO {
         this.cancelledAt = cancelledAt;
     }
 
+    public LocalDateTime getCheckoutApplyAt() {
+        return checkoutApplyAt;
+    }
+
+    public void setCheckoutApplyAt(LocalDateTime checkoutApplyAt) {
+        this.checkoutApplyAt = checkoutApplyAt;
+    }
+
+    public BigDecimal getRefundAmount() {
+        return refundAmount;
+    }
+
+    public void setRefundAmount(BigDecimal refundAmount) {
+        this.refundAmount = refundAmount;
+    }
+
+    public String getRefundPolicy() {
+        return refundPolicy;
+    }
+
+    public void setRefundPolicy(String refundPolicy) {
+        this.refundPolicy = refundPolicy;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public List<OrderGuestVO> getGuests() {
+        return guests;
+    }
+
+    public void setGuests(List<OrderGuestVO> guests) {
+        this.guests = guests;
     }
 }

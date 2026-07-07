@@ -2,6 +2,7 @@ package daydream.hotel.reservation.system.review.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import daydream.hotel.reservation.system.auth.security.LoginUser;
 import daydream.hotel.reservation.system.auth.security.SecurityUtils;
 import daydream.hotel.reservation.system.common.exception.BusinessException;
 import daydream.hotel.reservation.system.common.exception.ErrorCode;
@@ -20,7 +21,10 @@ import daydream.hotel.reservation.system.user.enums.UserRole;
 import daydream.hotel.reservation.system.user.mapper.UserMapper;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -104,7 +108,61 @@ public class ReviewService {
                                                                 HotelReview::getUserNickname,
                                                                 keyword))
                                 .orderByDesc(HotelReview::getCreatedAt));
-        return toPage(reviewPage);
+        return toPage(reviewPage, loadHotelNameMap(reviewPage.getRecords()));
+    }
+
+    public PageResult<ReviewVO> listMerchantReviews(String keyword, long page, long size) {
+        LoginUser loginUser = SecurityUtils.getLoginUser();
+        if (!UserRole.MERCHANT.name().equals(loginUser.getRole())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        List<Long> hotelIds =
+                hotelMapper
+                        .selectList(
+                                new LambdaQueryWrapper<Hotel>()
+                                        .eq(Hotel::getMerchantId, loginUser.getUserId()))
+                        .stream()
+                        .map(Hotel::getId)
+                        .toList();
+        if (hotelIds.isEmpty()) {
+            return new PageResult<>(List.of(), 0, page, size);
+        }
+        Page<HotelReview> reviewPage =
+                reviewMapper.selectPage(
+                        new Page<>(page, size),
+                        new LambdaQueryWrapper<HotelReview>()
+                                .in(HotelReview::getHotelId, hotelIds)
+                                .eq(HotelReview::getStatus, 1)
+                                .and(
+                                        StringUtils.hasText(keyword),
+                                        w ->
+                                                w.like(HotelReview::getContent, keyword)
+                                                        .or()
+                                                        .like(
+                                                                HotelReview::getUserNickname,
+                                                                keyword))
+                                .orderByDesc(HotelReview::getCreatedAt));
+        return toPage(reviewPage, loadHotelNameMap(reviewPage.getRecords()));
+    }
+
+    @Transactional
+    public ReviewVO replyToReview(Long id, String content) {
+        LoginUser loginUser = SecurityUtils.getLoginUser();
+        if (!UserRole.MERCHANT.name().equals(loginUser.getRole())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        HotelReview review = reviewMapper.selectById(id);
+        if (review == null || review.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        Hotel hotel = hotelMapper.selectById(review.getHotelId());
+        if (hotel == null || !hotel.getMerchantId().equals(loginUser.getUserId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        review.setMerchantReply(content.trim());
+        review.setReplyAt(LocalDateTime.now());
+        reviewMapper.updateById(review);
+        return toVO(review, hotel.getName());
     }
 
     @Transactional
@@ -141,13 +199,37 @@ public class ReviewService {
         hotelMapper.updateById(hotel);
     }
 
+    private Map<Long, String> loadHotelNameMap(List<HotelReview> reviews) {
+        List<Long> hotelIds = reviews.stream().map(HotelReview::getHotelId).distinct().toList();
+        if (hotelIds.isEmpty()) {
+            return Map.of();
+        }
+        return hotelMapper.selectBatchIds(hotelIds).stream()
+                .collect(Collectors.toMap(Hotel::getId, Hotel::getName));
+    }
+
     private PageResult<ReviewVO> toPage(Page<HotelReview> reviewPage) {
-        List<ReviewVO> list = reviewPage.getRecords().stream().map(this::toVO).toList();
+        return toPage(reviewPage, loadHotelNameMap(reviewPage.getRecords()));
+    }
+
+    private PageResult<ReviewVO> toPage(Page<HotelReview> reviewPage, Map<Long, String> hotelNameMap) {
+        List<ReviewVO> list =
+                reviewPage.getRecords().stream()
+                        .map(
+                                review ->
+                                        toVO(
+                                                review,
+                                                hotelNameMap.get(review.getHotelId())))
+                        .toList();
         return new PageResult<>(
                 list, reviewPage.getTotal(), reviewPage.getCurrent(), reviewPage.getSize());
     }
 
     private ReviewVO toVO(HotelReview review) {
+        return toVO(review, null);
+    }
+
+    private ReviewVO toVO(HotelReview review, String hotelName) {
         ReviewVO vo = new ReviewVO();
         vo.setId(review.getId());
         vo.setUserId(review.getUserId());
@@ -156,8 +238,11 @@ public class ReviewService {
         vo.setUserNickname(review.getUserNickname());
         vo.setRating(review.getRating());
         vo.setContent(review.getContent());
+        vo.setMerchantReply(review.getMerchantReply());
+        vo.setReplyAt(review.getReplyAt());
         vo.setStatus(review.getStatus());
         vo.setCreatedAt(review.getCreatedAt());
+        vo.setHotelName(hotelName);
         return vo;
     }
 }

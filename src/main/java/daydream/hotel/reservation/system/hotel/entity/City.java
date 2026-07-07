@@ -11,6 +11,7 @@ public class City {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long provinceId;
     private String name;
     private String code;
     private LocalDateTime createdAt;
@@ -21,6 +22,14 @@ public class City {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Long getProvinceId() {
+        return provinceId;
+    }
+
+    public void setProvinceId(Long provinceId) {
+        this.provinceId = provinceId;
     }
 
     public String getName() {

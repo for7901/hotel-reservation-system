@@ -21,7 +21,9 @@ function onChange(name: string | number) {
 
 <template>
   <div class="layout">
-    <router-view />
+    <main class="layout-content">
+      <router-view />
+    </main>
     <van-tabbar :model-value="active" @change="onChange">
       <van-tabbar-item name="home" icon="home-o">首页</van-tabbar-item>
       <van-tabbar-item name="orders" icon="orders-o">订单</van-tabbar-item>
@@ -33,5 +35,11 @@ function onChange(name: string | number) {
 <style scoped>
 .layout {
   min-height: 100vh;
+}
+
+.layout-content {
+  min-height: 100vh;
+  padding-bottom: calc(var(--van-tabbar-height, 50px) + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
 }
 </style>

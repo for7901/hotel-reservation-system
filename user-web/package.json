@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5173",
+    "dev:docker": "vite --port 5173 --mode docker",
     "build": "vite build",
     "preview": "vite preview"
   },

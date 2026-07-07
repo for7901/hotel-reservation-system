@@ -1,5 +1,12 @@
+export interface Province {
+  id: number
+  name: string
+  code: string
+}
+
 export interface City {
   id: number
+  provinceId: number
   name: string
   code: string
 }
@@ -55,6 +62,7 @@ export interface AdminHotel {
   merchantId: number
   merchantName: string
   cityId: number
+  provinceId?: number
   cityName: string
   name: string
   address: string

@@ -18,16 +18,19 @@ import daydream.hotel.reservation.system.hotel.dto.HotelAuditRequest;
 import daydream.hotel.reservation.system.hotel.dto.HotelDetailVO;
 import daydream.hotel.reservation.system.hotel.dto.HotelListItemVO;
 import daydream.hotel.reservation.system.hotel.dto.HotelSaveRequest;
+import daydream.hotel.reservation.system.hotel.dto.ProvinceVO;
 import daydream.hotel.reservation.system.hotel.dto.RoomTypeSaveRequest;
 import daydream.hotel.reservation.system.hotel.dto.RoomTypeVO;
 import daydream.hotel.reservation.system.hotel.entity.City;
 import daydream.hotel.reservation.system.hotel.entity.Hotel;
 import daydream.hotel.reservation.system.hotel.entity.HotelFacility;
+import daydream.hotel.reservation.system.hotel.entity.Province;
 import daydream.hotel.reservation.system.hotel.entity.RoomType;
 import daydream.hotel.reservation.system.hotel.enums.HotelStatus;
 import daydream.hotel.reservation.system.hotel.mapper.CityMapper;
 import daydream.hotel.reservation.system.hotel.mapper.HotelFacilityMapper;
 import daydream.hotel.reservation.system.hotel.mapper.HotelMapper;
+import daydream.hotel.reservation.system.hotel.mapper.ProvinceMapper;
 import daydream.hotel.reservation.system.hotel.mapper.RoomTypeMapper;
 import daydream.hotel.reservation.system.user.entity.User;
 import daydream.hotel.reservation.system.user.enums.UserRole;
@@ -45,6 +48,7 @@ import org.springframework.util.StringUtils;
 @Service
 public class HotelService {
 
+    private final ProvinceMapper provinceMapper;
     private final CityMapper cityMapper;
     private final HotelMapper hotelMapper;
     private final RoomTypeMapper roomTypeMapper;
@@ -55,6 +59,7 @@ public class HotelService {
     private final AppProperties appProperties;
 
     public HotelService(
+            ProvinceMapper provinceMapper,
             CityMapper cityMapper,
             HotelMapper hotelMapper,
             RoomTypeMapper roomTypeMapper,
@@ -63,6 +68,7 @@ public class HotelService {
             AuditLogService auditLogService,
             CacheService cacheService,
             AppProperties appProperties) {
+        this.provinceMapper = provinceMapper;
         this.cityMapper = cityMapper;
         this.hotelMapper = hotelMapper;
         this.roomTypeMapper = roomTypeMapper;
@@ -71,6 +77,40 @@ public class HotelService {
         this.auditLogService = auditLogService;
         this.cacheService = cacheService;
         this.appProperties = appProperties;
+    }
+
+    public List<ProvinceVO> listProvinces() {
+        return cacheService.get(
+                CacheKeys.PROVINCE_LIST,
+                new TypeReference<>() {},
+                () ->
+                        provinceMapper
+                                .selectList(
+                                        new LambdaQueryWrapper<Province>().orderByAsc(Province::getCode))
+                                .stream()
+                                .map(this::toProvinceVO)
+                                .toList(),
+                appProperties.getCache().getCityTtlSeconds());
+    }
+
+    public List<CityVO> listCities(Long provinceId) {
+        if (provinceId == null) {
+            return listCities();
+        }
+        String cacheKey = CacheKeys.CITY_LIST + ":" + provinceId;
+        return cacheService.get(
+                cacheKey,
+                new TypeReference<>() {},
+                () ->
+                        cityMapper
+                                .selectList(
+                                        new LambdaQueryWrapper<City>()
+                                                .eq(City::getProvinceId, provinceId)
+                                                .orderByAsc(City::getName))
+                                .stream()
+                                .map(this::toCityVO)
+                                .toList(),
+                appProperties.getCache().getCityTtlSeconds());
     }
 
     public List<CityVO> listCities() {
@@ -88,6 +128,7 @@ public class HotelService {
     }
 
     public PageResult<HotelListItemVO> searchHotels(
+            Long provinceId,
             Long cityId,
             String keyword,
             Integer starRating,
@@ -100,7 +141,6 @@ public class HotelService {
         LambdaQueryWrapper<Hotel> wrapper =
                 new LambdaQueryWrapper<Hotel>()
                         .eq(Hotel::getStatus, HotelStatus.APPROVED.name())
-                        .eq(cityId != null, Hotel::getCityId, cityId)
                         .eq(starRating != null, Hotel::getStarRating, starRating)
                         .ge(minPrice != null, Hotel::getMinPrice, minPrice)
                         .le(maxPrice != null, Hotel::getMinPrice, maxPrice)
@@ -111,6 +151,15 @@ public class HotelService {
                                         w.like(Hotel::getName, keyword)
                                                 .or()
                                                 .like(Hotel::getAddress, keyword));
+        if (cityId != null) {
+            wrapper.eq(Hotel::getCityId, cityId);
+        } else if (provinceId != null) {
+            List<Long> provinceCityIds = resolveCityIdsByProvince(provinceId);
+            if (provinceCityIds.isEmpty()) {
+                return new PageResult<>(List.of(), 0L, page, size);
+            }
+            wrapper.in(Hotel::getCityId, provinceCityIds);
+        }
 
         if ("PRICE_ASC".equals(sortBy)) {
             wrapper.orderByAsc(Hotel::getMinPrice);
@@ -412,24 +461,31 @@ public class HotelService {
                 .toList();
     }
 
-    private Map<Long, String> loadCityNameMap(List<Hotel> hotels) {
+    private Map<Long, City> loadCityMap(List<Hotel> hotels) {
         if (hotels.isEmpty()) {
             return Collections.emptyMap();
         }
         List<Long> cityIds = hotels.stream().map(Hotel::getCityId).distinct().toList();
         return cityMapper.selectBatchIds(cityIds).stream()
-                .collect(Collectors.toMap(City::getId, City::getName));
+                .collect(Collectors.toMap(City::getId, city -> city));
+    }
+
+    private Map<Long, String> loadCityNameMap(List<Hotel> hotels) {
+        return loadCityMap(hotels).entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getName()));
     }
 
     private PageResult<AdminHotelVO> toAdminPage(Page<Hotel> hotelPage) {
-        Map<Long, String> cityMap = loadCityNameMap(hotelPage.getRecords());
+        Map<Long, City> cityMap = loadCityMap(hotelPage.getRecords());
         Map<Long, String> merchantMap = loadMerchantNameMap(hotelPage.getRecords());
         List<AdminHotelVO> list =
                 hotelPage.getRecords().stream()
                         .map(
                                 hotel -> {
                                     AdminHotelVO vo = toAdminVO(hotel);
-                                    vo.setCityName(cityMap.get(hotel.getCityId()));
+                                    City city = cityMap.get(hotel.getCityId());
+                                    vo.setCityName(city != null ? city.getName() : "");
+                                    vo.setProvinceId(city != null ? city.getProvinceId() : null);
                                     vo.setMerchantName(merchantMap.get(hotel.getMerchantId()));
                                     return vo;
                                 })
@@ -453,9 +509,29 @@ public class HotelService {
                                                 : u.getPhone()));
     }
 
+    private List<Long> resolveCityIdsByProvince(Long provinceId) {
+        return cityMapper
+                .selectList(
+                        new LambdaQueryWrapper<City>()
+                                .eq(City::getProvinceId, provinceId)
+                                .select(City::getId))
+                .stream()
+                .map(City::getId)
+                .toList();
+    }
+
+    private ProvinceVO toProvinceVO(Province province) {
+        ProvinceVO vo = new ProvinceVO();
+        vo.setId(province.getId());
+        vo.setName(province.getName());
+        vo.setCode(province.getCode());
+        return vo;
+    }
+
     private CityVO toCityVO(City city) {
         CityVO vo = new CityVO();
         vo.setId(city.getId());
+        vo.setProvinceId(city.getProvinceId());
         vo.setName(city.getName());
         vo.setCode(city.getCode());
         return vo;

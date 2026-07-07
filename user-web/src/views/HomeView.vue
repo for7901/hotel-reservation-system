@@ -3,43 +3,44 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
 import { fetchBanners } from '@/api/banner'
-import { fetchCities } from '@/api/hotel'
+import { fetchCities, fetchProvinces } from '@/api/hotel'
+import RegionPicker from '@/components/RegionPicker.vue'
 import { defaultCheckIn, defaultCheckOut } from '@/utils/date'
 import type { Banner } from '@/api/banner'
-import type { City } from '@/types/hotel'
+import type { City, Province } from '@/types/hotel'
 
 const router = useRouter()
+const provinces = ref<Province[]>([])
 const cities = ref<City[]>([])
 const banners = ref<Banner[]>([])
+const provinceId = ref<number>()
 const cityId = ref<number>()
 const keyword = ref('')
 const checkInDate = ref(defaultCheckIn())
 const checkOutDate = ref(defaultCheckOut())
-const showCityPicker = ref(false)
+const showLocationPicker = ref(false)
 
 onMounted(async () => {
   try {
-    const [cityList, bannerList] = await Promise.all([fetchCities(), fetchBanners()])
-    cities.value = cityList
+    const [provinceList, bannerList] = await Promise.all([fetchProvinces(), fetchBanners()])
+    provinces.value = provinceList
     banners.value = bannerList
-    if (cities.value.length > 0) {
-      cityId.value = cities.value[0].id
-    }
   } catch (e) {
     showFailToast(e instanceof Error ? e.message : '加载失败')
   }
 })
 
-function onCityConfirm({ selectedOptions }: { selectedOptions: { text: string; value: number }[] }) {
-  cityId.value = selectedOptions[0]?.value
-  showCityPicker.value = false
+async function onRegionConfirm(value: { provinceId?: number; cityId?: number }) {
+  provinceId.value = value.provinceId
+  cityId.value = value.cityId
+  if (value.provinceId) {
+    cities.value = await fetchCities(value.provinceId)
+  } else {
+    cities.value = []
+  }
 }
 
 function handleSearch() {
-  if (!cityId.value) {
-    showFailToast('请选择城市')
-    return
-  }
   if (checkOutDate.value <= checkInDate.value) {
     showFailToast('离店日期须晚于入住日期')
     return
@@ -47,7 +48,8 @@ function handleSearch() {
   router.push({
     path: '/hotels',
     query: {
-      cityId: String(cityId.value),
+      ...(provinceId.value ? { provinceId: String(provinceId.value) } : {}),
+      ...(cityId.value ? { cityId: String(cityId.value) } : {}),
       keyword: keyword.value || undefined,
       checkInDate: checkInDate.value,
       checkOutDate: checkOutDate.value,
@@ -64,11 +66,13 @@ function openBanner(linkUrl: string) {
   router.push(linkUrl)
 }
 
-const cityColumns = () =>
-  cities.value.map((c) => ({ text: c.name, value: c.id }))
-
-const selectedCityName = () =>
-  cities.value.find((c) => c.id === cityId.value)?.name || '请选择城市'
+const selectedLocationName = () => {
+  if (!provinceId.value) return '全部地区'
+  const pName = provinces.value.find((p) => p.id === provinceId.value)?.name || ''
+  if (!cityId.value) return pName
+  const cName = cities.value.find((c) => c.id === cityId.value)?.name || ''
+  return `${pName} · ${cName}`
+}
 </script>
 
 <template>
@@ -86,12 +90,12 @@ const selectedCityName = () =>
     </div>
     <van-cell-group inset>
       <van-field
-        :model-value="selectedCityName()"
-        label="城市"
-        placeholder="请选择城市"
+        :model-value="selectedLocationName()"
+        label="地区"
+        placeholder="全部地区"
         readonly
         is-link
-        @click="showCityPicker = true"
+        @click="showLocationPicker = true"
       />
       <van-field v-model="checkInDate" label="入住" type="date" />
       <van-field v-model="checkOutDate" label="离店" type="date" />
@@ -100,13 +104,12 @@ const selectedCityName = () =>
     <div class="action">
       <van-button type="primary" block @click="handleSearch">搜索酒店</van-button>
     </div>
-    <van-popup v-model:show="showCityPicker" position="bottom">
-      <van-picker
-        :columns="cityColumns()"
-        @confirm="onCityConfirm"
-        @cancel="showCityPicker = false"
-      />
-    </van-popup>
+    <RegionPicker
+      v-model:show="showLocationPicker"
+      :province-id="provinceId"
+      :city-id="cityId"
+      @confirm="onRegionConfirm"
+    />
   </div>
 </template>
 

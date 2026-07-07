@@ -42,3 +42,19 @@ export function fetchAdminOrders(params: {
 export function fetchOrderDetail(id: number): Promise<Order> {
   return request.get(`/orders/${id}`) as Promise<Order>
 }
+
+export function approveOrderGuests(id: number): Promise<Order> {
+  return request.post(`/merchant/orders/${id}/approve-guests`) as Promise<Order>
+}
+
+export function rejectOrderGuests(id: number, reason: string): Promise<Order> {
+  return request.post(`/merchant/orders/${id}/reject-guests`, { reason }) as Promise<Order>
+}
+
+export function approveCheckout(id: number): Promise<Order> {
+  return request.post(`/merchant/orders/${id}/approve-checkout`) as Promise<Order>
+}
+
+export function rejectCheckout(id: number, reason: string): Promise<Order> {
+  return request.post(`/merchant/orders/${id}/reject-checkout`, { reason }) as Promise<Order>
+}

@@ -7,15 +7,18 @@ import {
   deleteHotel,
   fetchCities,
   fetchMerchantHotels,
+  fetchProvinces,
   updateHotel,
 } from '@/api/hotel'
-import type { AdminHotel, City, HotelSaveRequest } from '@/types/hotel'
+import type { AdminHotel, City, HotelSaveRequest, Province } from '@/types/hotel'
 
 const router = useRouter()
 const loading = ref(false)
 const hotels = ref<AdminHotel[]>([])
 const total = ref(0)
 const cities = ref<City[]>([])
+const provinces = ref<Province[]>([])
+const provinceId = ref<number>()
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 const page = ref(1)
@@ -59,6 +62,16 @@ async function loadData() {
   }
 }
 
+async function loadCitiesForProvince(pid: number) {
+  cities.value = await fetchCities(pid)
+  provinceId.value = pid
+}
+
+async function onProvinceChange(pid: number) {
+  await loadCitiesForProvince(pid)
+  form.cityId = cities.value[0]?.id || 0
+}
+
 function openCreate() {
   editingId.value = null
   Object.assign(form, {
@@ -74,8 +87,11 @@ function openCreate() {
   dialogVisible.value = true
 }
 
-function openEdit(row: AdminHotel) {
+async function openEdit(row: AdminHotel) {
   editingId.value = row.id
+  if (row.provinceId) {
+    await loadCitiesForProvince(row.provinceId)
+  }
   Object.assign(form, {
     cityId: row.cityId,
     name: row.name,
@@ -129,9 +145,12 @@ async function handleDelete(row: AdminHotel) {
 
 onMounted(async () => {
   try {
-    cities.value = await fetchCities()
+    provinces.value = await fetchProvinces()
+    if (provinces.value.length) {
+      await loadCitiesForProvince(provinces.value[0].id)
+    }
   } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : '加载城市失败')
+    ElMessage.error(e instanceof Error ? e.message : '加载地区失败')
   }
   await loadData()
 })
@@ -179,6 +198,11 @@ onMounted(async () => {
 
   <el-dialog v-model="dialogVisible" :title="editingId ? '编辑酒店' : '新增酒店'" width="520px">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
+      <el-form-item label="省份">
+        <el-select v-model="provinceId" style="width: 100%" @change="onProvinceChange">
+          <el-option v-for="p in provinces" :key="p.id" :label="p.name" :value="p.id" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="城市" prop="cityId">
         <el-select v-model="form.cityId" style="width: 100%">
           <el-option v-for="c in cities" :key="c.id" :label="c.name" :value="c.id" />

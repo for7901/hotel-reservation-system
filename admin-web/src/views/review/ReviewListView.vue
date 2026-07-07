@@ -50,7 +50,10 @@ onMounted(loadData)
     <el-table v-loading="loading" :data="reviews" stripe>
       <el-table-column prop="userNickname" label="用户" width="100" />
       <el-table-column prop="rating" label="评分" width="70" />
-      <el-table-column prop="content" label="内容" min-width="200" show-overflow-tooltip />
+      <el-table-column prop="content" label="内容" min-width="180" show-overflow-tooltip />
+      <el-table-column label="商家回复" min-width="160" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.merchantReply || '-' }}</template>
+      </el-table-column>
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
           <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '展示' : '隐藏' }}</el-tag>

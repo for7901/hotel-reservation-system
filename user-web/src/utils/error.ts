@@ -2,9 +2,14 @@ import type { AxiosError } from 'axios'
 import type { ApiResult } from '@/types/api'
 
 const PHONE_PATTERN = /^1[3-9]\d{9}$/
+const MASKED_PHONE_PATTERN = /^1[3-9]\d\*{4}\d{4}$/
 
 export function isValidPhone(phone: string): boolean {
   return PHONE_PATTERN.test(phone)
+}
+
+export function isMaskedPhone(phone: string): boolean {
+  return MASKED_PHONE_PATTERN.test(phone)
 }
 
 export function extractErrorMessage(error: unknown, fallback = '请求失败'): string {

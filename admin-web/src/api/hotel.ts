@@ -4,12 +4,17 @@ import type {
   City,
   HotelSaveRequest,
   PageResult,
+  Province,
   RoomType,
   RoomTypeSaveRequest,
 } from '@/types/hotel'
 
-export function fetchCities(): Promise<City[]> {
-  return request.get('/hotels/cities') as Promise<City[]>
+export function fetchProvinces(): Promise<Province[]> {
+  return request.get('/hotels/provinces') as Promise<Province[]>
+}
+
+export function fetchCities(provinceId?: number): Promise<City[]> {
+  return request.get('/hotels/cities', { params: provinceId ? { provinceId } : undefined }) as Promise<City[]>
 }
 
 export function fetchAdminHotels(params: {

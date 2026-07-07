@@ -1,29 +1,77 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
-import { searchHotels } from '@/api/hotel'
-import type { HotelListItem } from '@/types/hotel'
+import { fetchCities, fetchProvinces, searchHotels } from '@/api/hotel'
+import RegionPicker from '@/components/RegionPicker.vue'
+import type { City, HotelListItem, Province } from '@/types/hotel'
 
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
+const firstLoading = ref(true)
 const hotels = ref<HotelListItem[]>([])
 const finished = ref(false)
 const page = ref(1)
-const initialized = ref(false)
 const starRating = ref<number>()
 const sortBy = ref('')
 const showFilter = ref(false)
+const showRegionPicker = ref(false)
+
+const provinces = ref<Province[]>([])
+const filterCities = ref<City[]>([])
+const filterProvinceId = ref<number>()
+const filterCityId = ref<number>()
 
 const searchSummary = computed(() => {
   const parts: string[] = []
+  if (route.query.provinceId || route.query.cityId) {
+    const p = provinces.value.find((item) => item.id === Number(route.query.provinceId))
+    const c = filterCities.value.find((item) => item.id === Number(route.query.cityId))
+    if (p && c) parts.push(`${p.name} · ${c.name}`)
+    else if (p) parts.push(p.name)
+  }
   if (route.query.checkInDate && route.query.checkOutDate) {
     parts.push(`${route.query.checkInDate} ~ ${route.query.checkOutDate}`)
   }
   if (route.query.keyword) parts.push(route.query.keyword as string)
   return parts.join(' · ') || '全部酒店'
 })
+
+async function initLocationFilter() {
+  try {
+    provinces.value = await fetchProvinces()
+    const provinceId = route.query.provinceId ? Number(route.query.provinceId) : undefined
+    const cityId = route.query.cityId ? Number(route.query.cityId) : undefined
+    filterProvinceId.value = provinceId
+    filterCityId.value = cityId
+    if (provinceId) {
+      filterCities.value = await fetchCities(provinceId)
+    } else {
+      filterCities.value = []
+    }
+  } catch (e) {
+    showFailToast(e instanceof Error ? e.message : '加载地区失败')
+  }
+}
+
+async function onFilterRegionConfirm(value: { provinceId?: number; cityId?: number }) {
+  filterProvinceId.value = value.provinceId
+  filterCityId.value = value.cityId
+  if (value.provinceId) {
+    filterCities.value = await fetchCities(value.provinceId)
+  } else {
+    filterCities.value = []
+  }
+}
+
+const filterLocationName = () => {
+  if (!filterProvinceId.value) return '不限'
+  const p = provinces.value.find((item) => item.id === filterProvinceId.value)
+  if (!filterCityId.value) return p?.name || '不限'
+  const c = filterCities.value.find((item) => item.id === filterCityId.value)
+  return p && c ? `${p.name} · ${c.name}` : p?.name || '不限'
+}
 
 async function loadHotels(reset = false) {
   if (loading.value) return
@@ -34,9 +82,11 @@ async function loadHotels(reset = false) {
       hotels.value = []
       finished.value = false
     }
+    const provinceId = route.query.provinceId ? Number(route.query.provinceId) : undefined
     const cityId = route.query.cityId ? Number(route.query.cityId) : undefined
     const keyword = (route.query.keyword as string) || undefined
     const result = await searchHotels({
+      provinceId,
       cityId,
       keyword,
       starRating: starRating.value,
@@ -55,9 +105,24 @@ async function loadHotels(reset = false) {
     finished.value = true
   } finally {
     loading.value = false
-    initialized.value = true
+    firstLoading.value = false
   }
 }
+
+onMounted(async () => {
+  await initLocationFilter()
+  await loadHotels(true)
+})
+
+watch(
+  () => [route.query.provinceId, route.query.cityId, route.query.keyword, route.query.checkInDate, route.query.checkOutDate],
+  async () => {
+    if (!firstLoading.value) {
+      await initLocationFilter()
+      loadHotels(true)
+    }
+  },
+)
 
 function goDetail(id: number) {
   router.push({
@@ -71,10 +136,17 @@ function goDetail(id: number) {
 
 function applyFilter() {
   showFilter.value = false
-  loadHotels(true)
+  router.replace({
+    path: '/hotels',
+    query: {
+      ...(filterProvinceId.value ? { provinceId: String(filterProvinceId.value) } : {}),
+      ...(filterCityId.value ? { cityId: String(filterCityId.value) } : {}),
+      keyword: route.query.keyword,
+      checkInDate: route.query.checkInDate,
+      checkOutDate: route.query.checkOutDate,
+    },
+  })
 }
-
-watch(() => route.query, () => loadHotels(true))
 </script>
 
 <template>
@@ -86,9 +158,10 @@ watch(() => route.query, () => loadHotels(true))
     </van-nav-bar>
     <div class="summary">{{ searchSummary }}</div>
     <van-list
-      v-if="initialized"
+      v-if="!firstLoading"
       v-model:loading="loading"
       :finished="finished"
+      :immediate-check="false"
       finished-text="没有更多了"
       @load="loadHotels()"
     >
@@ -107,6 +180,8 @@ watch(() => route.query, () => loadHotels(true))
 
     <van-action-sheet v-model:show="showFilter" title="筛选排序">
       <div class="filter-panel">
+        <div class="filter-label">地区</div>
+        <van-cell :title="filterLocationName()" is-link @click="showRegionPicker = true" />
         <div class="filter-label">星级</div>
         <van-radio-group v-model="starRating" direction="horizontal">
           <van-radio :name="undefined">不限</van-radio>
@@ -123,6 +198,12 @@ watch(() => route.query, () => loadHotels(true))
         <van-button type="primary" block class="filter-apply" @click="applyFilter">应用</van-button>
       </div>
     </van-action-sheet>
+    <RegionPicker
+      v-model:show="showRegionPicker"
+      :province-id="filterProvinceId"
+      :city-id="filterCityId"
+      @confirm="onFilterRegionConfirm"
+    />
   </div>
 </template>
 
@@ -192,6 +273,8 @@ watch(() => route.query, () => loadHotels(true))
 
 .filter-panel {
   padding: 16px;
+  max-height: 70vh;
+  overflow-y: auto;
 }
 
 .filter-label {

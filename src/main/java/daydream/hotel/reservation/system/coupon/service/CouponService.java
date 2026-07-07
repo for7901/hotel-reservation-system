@@ -151,6 +151,21 @@ public class CouponService {
         return toCouponVO(coupon, null);
     }
 
+    @Transactional
+    public CouponVO updateCouponStatus(Long id, Integer status) {
+        requireAdmin();
+        if (status == null || (status != 0 && status != 1)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST);
+        }
+        Coupon coupon = couponMapper.selectById(id);
+        if (coupon == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        coupon.setStatus(status);
+        couponMapper.updateById(coupon);
+        return toCouponVO(coupon, null);
+    }
+
     private Coupon getActiveCoupon(Long couponId) {
         Coupon coupon = couponMapper.selectById(couponId);
         if (coupon == null || coupon.getStatus() != 1) {

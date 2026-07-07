@@ -10,6 +10,7 @@ public class AdminHotelVO {
     private Long merchantId;
     private String merchantName;
     private Long cityId;
+    private Long provinceId;
     private String cityName;
     private String name;
     private String address;
@@ -53,6 +54,14 @@ public class AdminHotelVO {
 
     public void setCityId(Long cityId) {
         this.cityId = cityId;
+    }
+
+    public Long getProvinceId() {
+        return provinceId;
+    }
+
+    public void setProvinceId(Long provinceId) {
+        this.provinceId = provinceId;
     }
 
     public String getCityName() {

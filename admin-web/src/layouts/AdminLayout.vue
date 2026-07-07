@@ -13,6 +13,7 @@ const activeMenu = computed(() => {
   if (route.path.startsWith('/audit')) return '/audit'
   if (route.path.startsWith('/orders')) return '/orders'
   if (route.path.startsWith('/users')) return '/users'
+  if (route.path.startsWith('/merchant-reviews')) return '/merchant-reviews'
   if (route.path.startsWith('/reviews')) return '/reviews'
   if (route.path.startsWith('/banners')) return '/banners'
   if (route.path.startsWith('/coupons')) return '/coupons'
@@ -34,6 +35,7 @@ const menuItems = computed(() => {
   if (authStore.user?.role === 'MERCHANT') {
     items.push({ path: '/hotels', title: '我的酒店' })
     items.push({ path: '/orders', title: '订单管理' })
+    items.push({ path: '/merchant-reviews', title: '评价管理' })
   }
   return items
 })

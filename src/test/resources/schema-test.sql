@@ -11,11 +11,20 @@ CREATE TABLE IF NOT EXISTS sys_user (
     deleted    TINYINT      NOT NULL DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS city (
+CREATE TABLE IF NOT EXISTS province (
     id         BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name       VARCHAR(50)  NOT NULL UNIQUE,
-    code       VARCHAR(20)  DEFAULT NULL,
+    name       VARCHAR(50)  NOT NULL,
+    code       VARCHAR(20)  NOT NULL UNIQUE,
     created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS city (
+    id          BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    province_id BIGINT       DEFAULT NULL,
+    name        VARCHAR(50)  NOT NULL,
+    code        VARCHAR(20)  DEFAULT NULL,
+    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (province_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS hotel (
@@ -81,6 +90,7 @@ CREATE TABLE IF NOT EXISTS hotel_order (
     check_in_date   DATE          NOT NULL,
     check_out_date  DATE          NOT NULL,
     nights          INT           NOT NULL,
+    guest_count     INT           NOT NULL DEFAULT 1,
     guest_name      VARCHAR(50)   NOT NULL,
     guest_phone     VARCHAR(20)   NOT NULL,
     unit_price      DECIMAL(10,2) NOT NULL,
@@ -88,10 +98,24 @@ CREATE TABLE IF NOT EXISTS hotel_order (
     coupon_id       BIGINT        DEFAULT NULL,
     discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
     status          VARCHAR(20)   NOT NULL DEFAULT 'PENDING_PAYMENT',
+    reject_reason   VARCHAR(255)  DEFAULT NULL,
     paid_at         TIMESTAMP     DEFAULT NULL,
     cancelled_at    TIMESTAMP     DEFAULT NULL,
+    checkout_apply_at TIMESTAMP   DEFAULT NULL,
+    refund_amount   DECIMAL(10,2) DEFAULT NULL,
+    refund_policy   VARCHAR(255)  DEFAULT NULL,
     created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS order_guest (
+    id         BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    order_id   BIGINT       NOT NULL,
+    name       VARCHAR(50)  NOT NULL,
+    phone      VARCHAR(20)  NOT NULL,
+    id_card    VARCHAR(18)  DEFAULT NULL,
+    sort_order TINYINT      NOT NULL DEFAULT 0,
+    created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS hotel_review (
@@ -102,6 +126,8 @@ CREATE TABLE IF NOT EXISTS hotel_review (
     user_nickname   VARCHAR(50)  DEFAULT NULL,
     rating          TINYINT      NOT NULL,
     content         VARCHAR(500) DEFAULT NULL,
+    merchant_reply  VARCHAR(500) DEFAULT NULL,
+    reply_at        TIMESTAMP    DEFAULT NULL,
     status          TINYINT      NOT NULL DEFAULT 1,
     created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

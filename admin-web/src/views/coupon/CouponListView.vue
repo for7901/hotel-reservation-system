@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { createCoupon, fetchCoupons } from '@/api/coupon'
+import { createCoupon, fetchCoupons, updateCouponStatus } from '@/api/coupon'
 import type { Coupon, CouponSaveRequest } from '@/api/coupon'
 
 const loading = ref(false)
@@ -31,6 +31,17 @@ async function handleSave() {
   }
 }
 
+async function toggleStatus(row: Coupon) {
+  const next = row.status === 1 ? 0 : 1
+  try {
+    await updateCouponStatus(row.id, next)
+    ElMessage.success(next === 1 ? '已启用' : '已禁用')
+    loadData()
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '操作失败')
+  }
+}
+
 onMounted(loadData)
 </script>
 
@@ -47,7 +58,18 @@ onMounted(loadData)
       <el-table-column label="面额" width="90"><template #default="{ row }">¥{{ row.amount }}</template></el-table-column>
       <el-table-column label="门槛" width="90"><template #default="{ row }">¥{{ row.minAmount }}</template></el-table-column>
       <el-table-column label="领取" width="100"><template #default="{ row }">{{ row.claimedCount }}/{{ row.totalCount }}</template></el-table-column>
-      <el-table-column label="状态" width="80"><template #default="{ row }">{{ row.status === 1 ? '启用' : '禁用' }}</template></el-table-column>
+      <el-table-column label="状态" width="90">
+        <template #default="{ row }">
+          <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '禁用' }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="100" fixed="right">
+        <template #default="{ row }">
+          <el-button link :type="row.status === 1 ? 'danger' : 'primary'" @click="toggleStatus(row)">
+            {{ row.status === 1 ? '禁用' : '启用' }}
+          </el-button>
+        </template>
+      </el-table-column>
       <template #empty><el-empty description="暂无优惠券" /></template>
     </el-table>
   </el-card>

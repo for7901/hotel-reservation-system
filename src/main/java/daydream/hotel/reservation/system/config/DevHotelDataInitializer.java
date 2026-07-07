@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @Profile("!test")
-@Order(2)
+@Order(3)
 public class DevHotelDataInitializer implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DevHotelDataInitializer.class);
@@ -56,7 +56,12 @@ public class DevHotelDataInitializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         try {
-            if (cityMapper.selectCount(null) > 0) {
+            if (userMapper.selectCount(
+                            new LambdaQueryWrapper<User>().eq(User::getPhone, "13800100001"))
+                    > 0) {
+                return;
+            }
+            if (hotelMapper.selectCount(null) > 0) {
                 return;
             }
             User merchant =
@@ -69,9 +74,13 @@ public class DevHotelDataInitializer implements ApplicationRunner {
                 return;
             }
 
-            City hangzhou = createCity("杭州", "hangzhou");
-            City shanghai = createCity("上海", "shanghai");
-            City beijing = createCity("北京", "beijing");
+            City hangzhou = findCity("杭州");
+            City shanghai = findCity("上海");
+            City beijing = findCity("北京");
+            if (hangzhou == null || shanghai == null || beijing == null) {
+                log.warn("Skip hotel seed: demo cities not found, wait for region initializer");
+                return;
+            }
 
             Hotel h1 =
                     createHotel(
@@ -117,12 +126,8 @@ public class DevHotelDataInitializer implements ApplicationRunner {
         }
     }
 
-    private City createCity(String name, String code) {
-        City city = new City();
-        city.setName(name);
-        city.setCode(code);
-        cityMapper.insert(city);
-        return city;
+    private City findCity(String name) {
+        return cityMapper.selectOne(new LambdaQueryWrapper<City>().eq(City::getName, name).last("LIMIT 1"));
     }
 
     private Hotel createHotel(

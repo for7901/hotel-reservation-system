@@ -29,6 +29,10 @@ export function cancelOrder(id: number): Promise<Order> {
   return request.post(`/orders/${id}/cancel`) as Promise<Order>
 }
 
+export function applyCheckout(id: number): Promise<Order> {
+  return request.post(`/orders/${id}/apply-checkout`) as Promise<Order>
+}
+
 export function completeOrder(id: number): Promise<Order> {
   return request.post(`/orders/${id}/complete`) as Promise<Order>
 }

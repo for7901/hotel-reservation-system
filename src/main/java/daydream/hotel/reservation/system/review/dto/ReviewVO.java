@@ -11,8 +11,11 @@ public class ReviewVO {
     private String userNickname;
     private Integer rating;
     private String content;
+    private String merchantReply;
+    private LocalDateTime replyAt;
     private Integer status;
     private LocalDateTime createdAt;
+    private String hotelName;
 
     public Long getId() {
         return id;
@@ -70,6 +73,22 @@ public class ReviewVO {
         this.content = content;
     }
 
+    public String getMerchantReply() {
+        return merchantReply;
+    }
+
+    public void setMerchantReply(String merchantReply) {
+        this.merchantReply = merchantReply;
+    }
+
+    public LocalDateTime getReplyAt() {
+        return replyAt;
+    }
+
+    public void setReplyAt(LocalDateTime replyAt) {
+        this.replyAt = replyAt;
+    }
+
     public Integer getStatus() {
         return status;
     }
@@ -84,5 +103,13 @@ public class ReviewVO {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getHotelName() {
+        return hotelName;
+    }
+
+    public void setHotelName(String hotelName) {
+        this.hotelName = hotelName;
     }
 }

@@ -31,10 +31,20 @@ public class GlobalExceptionHandler {
     public Result<Void> handleValidationException(MethodArgumentNotValidException ex) {
         String message =
                 ex.getBindingResult().getFieldErrors().stream()
-                        .map(FieldError::getDefaultMessage)
+                        .map(this::formatFieldError)
                         .findFirst()
                         .orElse(ErrorCode.BAD_REQUEST.getMessage());
         return Result.fail(ErrorCode.BAD_REQUEST.getCode(), message);
+    }
+
+    private String formatFieldError(FieldError error) {
+        String field = error.getField() == null ? "" : error.getField();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("guests\\[(\\d+)]").matcher(field);
+        if (matcher.find()) {
+            int index = Integer.parseInt(matcher.group(1)) + 1;
+            return "入住人" + index + "：" + error.getDefaultMessage();
+        }
+        return error.getDefaultMessage();
     }
 
     @ExceptionHandler({
