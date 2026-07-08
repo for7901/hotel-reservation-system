@@ -22,8 +22,6 @@ const tabs = [
 ]
 
 async function loadOrders(reset = false) {
-  if (loading.value) return
-  loading.value = true
   try {
     if (reset) {
       page.value = 1
@@ -36,9 +34,8 @@ async function loadOrders(reset = false) {
       size: 10,
     })
     orders.value.push(...result.list)
-    if (orders.value.length >= result.total) {
-      finished.value = true
-    } else {
+    finished.value = orders.value.length >= result.total || result.list.length === 0
+    if (!finished.value) {
       page.value += 1
     }
   } catch (e) {

@@ -11,8 +11,8 @@ const authStore = useAuthStore()
 const loading = ref(false)
 
 const form = reactive({
-  phone: '13800000000',
-  password: 'admin123',
+  phone: '',
+  password: '',
 })
 
 async function handleLogin() {
@@ -57,7 +57,6 @@ async function handleLogin() {
           </el-button>
         </el-form-item>
       </el-form>
-      <p class="hint">演示账号：13800000000 / admin123</p>
     </el-card>
   </div>
 </template>
@@ -77,13 +76,6 @@ async function handleLogin() {
 
 .login-card h2 {
   margin: 0;
-  text-align: center;
-}
-
-.hint {
-  margin: 0;
-  font-size: 12px;
-  color: #909399;
   text-align: center;
 }
 </style>

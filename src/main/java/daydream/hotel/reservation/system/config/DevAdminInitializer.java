@@ -32,7 +32,6 @@ public class DevAdminInitializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         initUser("13800000000", "admin123", "系统管理员", UserRole.ADMIN);
-        initUser("13800000001", "merchant123", "演示商家", UserRole.MERCHANT);
     }
 
     private void initUser(String phone, String password, String nickname, UserRole role) {

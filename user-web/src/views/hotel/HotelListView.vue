@@ -74,8 +74,6 @@ const filterLocationName = () => {
 }
 
 async function loadHotels(reset = false) {
-  if (loading.value) return
-  loading.value = true
   try {
     if (reset) {
       page.value = 1
@@ -95,9 +93,8 @@ async function loadHotels(reset = false) {
       size: 10,
     })
     hotels.value.push(...result.list)
-    if (hotels.value.length >= result.total) {
-      finished.value = true
-    } else {
+    finished.value = hotels.value.length >= result.total || result.list.length === 0
+    if (!finished.value) {
       page.value += 1
     }
   } catch (e) {

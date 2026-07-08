@@ -1,4 +1,5 @@
-target/
+target/*
+!target/hotel-reservation-system-*.jar
 .idea/
 *.iml
 .env

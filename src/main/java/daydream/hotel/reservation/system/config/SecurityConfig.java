@@ -51,18 +51,33 @@ public class SecurityConfig {
                                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(
                         auth ->
-                                auth.requestMatchers("/health", "/auth/**")
+                                auth.requestMatchers(
+                                                "/health",
+                                                "/api/health",
+                                                "/auth/**",
+                                                "/api/auth/**")
                                         .permitAll()
-                                        .requestMatchers("/hotels/**")
+                                        .requestMatchers("/hotels/**", "/api/hotels/**")
                                         .permitAll()
-                                        .requestMatchers(HttpMethod.GET, "/banners", "/banners/**")
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/banners",
+                                                "/api/banners",
+                                                "/banners/**",
+                                                "/api/banners/**")
                                         .permitAll()
-                                        .requestMatchers(HttpMethod.GET, "/reviews/hotels/**")
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/reviews/hotels/**",
+                                                "/api/reviews/hotels/**")
                                         .permitAll()
                                         .requestMatchers(
                                                 "/v3/api-docs/**",
+                                                "/api/v3/api-docs/**",
                                                 "/swagger-ui/**",
-                                                "/swagger-ui.html")
+                                                "/api/swagger-ui/**",
+                                                "/swagger-ui.html",
+                                                "/api/swagger-ui.html")
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())
@@ -86,7 +101,9 @@ public class SecurityConfig {
                         "http://localhost:5175",
                         "http://127.0.0.1:5173",
                         "http://127.0.0.1:5174",
-                        "http://127.0.0.1:5175"));
+                        "http://127.0.0.1:5175",
+                        "http://118.31.116.107",
+                        "https://118.31.116.107"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

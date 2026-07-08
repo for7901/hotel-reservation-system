@@ -102,7 +102,7 @@ cd admin-web && npm install && npm run dev
 | 端 | 手机号 | 密码 | 角色 |
 |----|--------|------|------|
 | 管理端 | 13800000000 | admin123 | ADMIN |
-| 商家端 | 13800000001 | merchant123 | MERCHANT |
+| 商家端 | 13800100001 ~ 13800100010 | merchant123 | MERCHANT |
 
 用户端请自行注册，或使用 Swagger 调用 `POST /api/auth/register`。
 
