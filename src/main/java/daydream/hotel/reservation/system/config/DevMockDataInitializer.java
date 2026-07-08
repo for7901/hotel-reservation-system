@@ -53,7 +53,9 @@ public class DevMockDataInitializer implements ApplicationRunner {
 
     private static final String[] DISTRICTS = {"中心", "新区", "高新", "古城", "滨江", "经开", "文化", "商业"};
 
-    private static final String[] STREETS = {"解放路", "人民路", "中山路", "建设路", "文化路", "和平路", "迎宾路", "长安街"};
+    private static final String[] STREETS = {
+        "解放路", "人民路", "中山路", "建设路", "文化路", "和平路", "迎宾路", "长安街"
+    };
 
     private static final String[][] FACILITY_SETS = {
         {"免费WiFi", "停车场", "早餐"},
@@ -168,9 +170,7 @@ public class DevMockDataInitializer implements ApplicationRunner {
         int streetNo = 1 + random.nextInt(200);
         String address = district + street + streetNo + "号";
         String description =
-                String.format(
-                        "%s%s，位于%s，提供舒适便捷的住宿体验，适合商务与休闲出行。",
-                        city.getName(), suffix, district);
+                String.format("%s%s，位于%s，提供舒适便捷的住宿体验，适合商务与休闲出行。", city.getName(), suffix, district);
 
         Hotel hotel = new Hotel();
         hotel.setMerchantId(merchantId);
@@ -181,8 +181,7 @@ public class DevMockDataInitializer implements ApplicationRunner {
         hotel.setDescription(description);
         hotel.setStatus(HotelStatus.APPROVED.name());
         hotel.setScore(
-                BigDecimal.valueOf(4.0 + random.nextDouble())
-                        .setScale(1, RoundingMode.HALF_UP));
+                BigDecimal.valueOf(4.0 + random.nextDouble()).setScale(1, RoundingMode.HALF_UP));
         hotel.setCoverImage(COVER_IMAGES[random.nextInt(COVER_IMAGES.length)]);
         hotelMapper.insert(hotel);
 
@@ -195,7 +194,14 @@ public class DevMockDataInitializer implements ApplicationRunner {
         }
 
         BigDecimal basePrice = BigDecimal.valueOf(180 + random.nextInt(620));
-        createRoomType(hotel.getId(), "标准大床房", "大床", 28 + random.nextInt(10), 2, basePrice, random.nextInt(2));
+        createRoomType(
+                hotel.getId(),
+                "标准大床房",
+                "大床",
+                28 + random.nextInt(10),
+                2,
+                basePrice,
+                random.nextInt(2));
         createRoomType(
                 hotel.getId(),
                 "豪华双床房",

@@ -86,7 +86,8 @@ public class HotelService {
                 () ->
                         provinceMapper
                                 .selectList(
-                                        new LambdaQueryWrapper<Province>().orderByAsc(Province::getCode))
+                                        new LambdaQueryWrapper<Province>()
+                                                .orderByAsc(Province::getCode))
                                 .stream()
                                 .map(this::toProvinceVO)
                                 .toList(),

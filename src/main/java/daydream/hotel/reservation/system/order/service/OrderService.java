@@ -215,9 +215,7 @@ public class OrderService {
                                 : LocalDateTime.now());
         if (refundResult.refundFromDate() != null) {
             inventoryService.releaseInventory(
-                    order.getRoomTypeId(),
-                    refundResult.refundFromDate(),
-                    order.getCheckOutDate());
+                    order.getRoomTypeId(), refundResult.refundFromDate(), order.getCheckOutDate());
         }
         if (refundResult.refundAmount().compareTo(order.getTotalAmount()) >= 0) {
             couponService.releaseCoupon(order.getCouponId());
@@ -376,7 +374,8 @@ public class OrderService {
             entity.setOrderId(orderId);
             entity.setName(guest.getName().trim());
             entity.setPhone(guest.getPhone());
-            entity.setIdCard(StringUtils.hasText(guest.getIdCard()) ? guest.getIdCard().trim() : null);
+            entity.setIdCard(
+                    StringUtils.hasText(guest.getIdCard()) ? guest.getIdCard().trim() : null);
             entity.setSortOrder(i);
             orderGuestMapper.insert(entity);
         }

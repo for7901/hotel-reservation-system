@@ -212,14 +212,11 @@ public class ReviewService {
         return toPage(reviewPage, loadHotelNameMap(reviewPage.getRecords()));
     }
 
-    private PageResult<ReviewVO> toPage(Page<HotelReview> reviewPage, Map<Long, String> hotelNameMap) {
+    private PageResult<ReviewVO> toPage(
+            Page<HotelReview> reviewPage, Map<Long, String> hotelNameMap) {
         List<ReviewVO> list =
                 reviewPage.getRecords().stream()
-                        .map(
-                                review ->
-                                        toVO(
-                                                review,
-                                                hotelNameMap.get(review.getHotelId())))
+                        .map(review -> toVO(review, hotelNameMap.get(review.getHotelId())))
                         .toList();
         return new PageResult<>(
                 list, reviewPage.getTotal(), reviewPage.getCurrent(), reviewPage.getSize());

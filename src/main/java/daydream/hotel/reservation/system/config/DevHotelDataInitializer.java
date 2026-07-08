@@ -127,7 +127,8 @@ public class DevHotelDataInitializer implements ApplicationRunner {
     }
 
     private City findCity(String name) {
-        return cityMapper.selectOne(new LambdaQueryWrapper<City>().eq(City::getName, name).last("LIMIT 1"));
+        return cityMapper.selectOne(
+                new LambdaQueryWrapper<City>().eq(City::getName, name).last("LIMIT 1"));
     }
 
     private Hotel createHotel(

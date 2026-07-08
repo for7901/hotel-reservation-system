@@ -39,7 +39,8 @@ public class GlobalExceptionHandler {
 
     private String formatFieldError(FieldError error) {
         String field = error.getField() == null ? "" : error.getField();
-        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("guests\\[(\\d+)]").matcher(field);
+        java.util.regex.Matcher matcher =
+                java.util.regex.Pattern.compile("guests\\[(\\d+)]").matcher(field);
         if (matcher.find()) {
             int index = Integer.parseInt(matcher.group(1)) + 1;
             return "入住人" + index + "：" + error.getDefaultMessage();

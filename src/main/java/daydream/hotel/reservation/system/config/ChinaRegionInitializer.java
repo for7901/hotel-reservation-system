@@ -64,11 +64,14 @@ public class ChinaRegionInitializer implements ApplicationRunner {
     }
 
     private void syncCityProvinceFromJson() throws Exception {
-        List<RawProvince> rawProvinces = readJson("data/china/provinces.json", new TypeReference<>() {});
+        List<RawProvince> rawProvinces =
+                readJson("data/china/provinces.json", new TypeReference<>() {});
         List<RawCity> rawCities = readJson("data/china/cities.json", new TypeReference<>() {});
         Map<String, Long> provinceCodeToId =
                 provinceMapper.selectList(null).stream()
-                        .collect(java.util.stream.Collectors.toMap(Province::getCode, Province::getId));
+                        .collect(
+                                java.util.stream.Collectors.toMap(
+                                        Province::getCode, Province::getId));
 
         Map<String, City> legacyByName = new HashMap<>();
         cityMapper.selectList(null).forEach(city -> legacyByName.put(city.getName(), city));
@@ -84,7 +87,8 @@ public class ChinaRegionInitializer implements ApplicationRunner {
                 continue;
             }
             String cityName = resolveCityName(raw.name(), raw.provinceCode(), rawProvinces);
-            UpsertResult result = upsertCity(legacyByName, provinceId, cityName, raw.code(), raw.name());
+            UpsertResult result =
+                    upsertCity(legacyByName, provinceId, cityName, raw.code(), raw.name());
             if (result == UpsertResult.INSERTED) {
                 inserted++;
             } else if (result == UpsertResult.UPDATED) {
@@ -98,7 +102,8 @@ public class ChinaRegionInitializer implements ApplicationRunner {
     }
 
     private void seedFromJson() throws Exception {
-        List<RawProvince> rawProvinces = readJson("data/china/provinces.json", new TypeReference<>() {});
+        List<RawProvince> rawProvinces =
+                readJson("data/china/provinces.json", new TypeReference<>() {});
         List<RawCity> rawCities = readJson("data/china/cities.json", new TypeReference<>() {});
 
         Map<String, Long> provinceCodeToId = new HashMap<>();
@@ -110,28 +115,28 @@ public class ChinaRegionInitializer implements ApplicationRunner {
             provinceCodeToId.put(raw.code(), province.getId());
         }
 
-            Map<String, City> existingByName = new HashMap<>();
-            cityMapper.selectList(null).forEach(city -> existingByName.put(city.getName(), city));
+        Map<String, City> existingByName = new HashMap<>();
+        cityMapper.selectList(null).forEach(city -> existingByName.put(city.getName(), city));
 
-            int inserted = 0;
-            int updated = 0;
-            for (RawCity raw : rawCities) {
-                if (SKIP_CITY_NAMES.contains(raw.name())) {
-                    continue;
-                }
-                Long provinceId = provinceCodeToId.get(raw.provinceCode());
-                if (provinceId == null) {
-                    continue;
-                }
-                String cityName = resolveCityName(raw.name(), raw.provinceCode(), rawProvinces);
-                UpsertResult result =
-                        upsertCity(existingByName, provinceId, cityName, raw.code(), raw.name());
-                if (result == UpsertResult.INSERTED) {
-                    inserted++;
-                } else if (result == UpsertResult.UPDATED) {
-                    updated++;
-                }
+        int inserted = 0;
+        int updated = 0;
+        for (RawCity raw : rawCities) {
+            if (SKIP_CITY_NAMES.contains(raw.name())) {
+                continue;
             }
+            Long provinceId = provinceCodeToId.get(raw.provinceCode());
+            if (provinceId == null) {
+                continue;
+            }
+            String cityName = resolveCityName(raw.name(), raw.provinceCode(), rawProvinces);
+            UpsertResult result =
+                    upsertCity(existingByName, provinceId, cityName, raw.code(), raw.name());
+            if (result == UpsertResult.INSERTED) {
+                inserted++;
+            } else if (result == UpsertResult.UPDATED) {
+                updated++;
+            }
+        }
 
         int backfilled = ensureDefaultCities();
         log.info(
@@ -150,7 +155,11 @@ public class ChinaRegionInitializer implements ApplicationRunner {
     }
 
     private UpsertResult upsertCity(
-            Map<String, City> legacyByName, Long provinceId, String cityName, String code, String rawName) {
+            Map<String, City> legacyByName,
+            Long provinceId,
+            String cityName,
+            String code,
+            String rawName) {
         City existing =
                 cityMapper.selectOne(
                         new LambdaQueryWrapper<City>()
@@ -187,11 +196,13 @@ public class ChinaRegionInitializer implements ApplicationRunner {
     private int ensureDefaultCities() {
         int count = 0;
         List<Province> provinces =
-                provinceMapper.selectList(new LambdaQueryWrapper<Province>().orderByAsc(Province::getCode));
+                provinceMapper.selectList(
+                        new LambdaQueryWrapper<Province>().orderByAsc(Province::getCode));
         for (Province province : provinces) {
             long cityCount =
                     cityMapper.selectCount(
-                            new LambdaQueryWrapper<City>().eq(City::getProvinceId, province.getId()));
+                            new LambdaQueryWrapper<City>()
+                                    .eq(City::getProvinceId, province.getId()));
             if (cityCount > 0) {
                 continue;
             }
@@ -215,13 +226,15 @@ public class ChinaRegionInitializer implements ApplicationRunner {
         if (direct != null) {
             return direct;
         }
-        if (rawName.endsWith("市") && existingByName.containsKey(rawName.substring(0, rawName.length() - 1))) {
+        if (rawName.endsWith("市")
+                && existingByName.containsKey(rawName.substring(0, rawName.length() - 1))) {
             return existingByName.get(rawName.substring(0, rawName.length() - 1));
         }
         return null;
     }
 
-    private String resolveCityName(String rawName, String provinceCode, List<RawProvince> provinces) {
+    private String resolveCityName(
+            String rawName, String provinceCode, List<RawProvince> provinces) {
         if (MUNICIPALITY_CODES.contains(provinceCode)) {
             return provinces.stream()
                     .filter(p -> p.code().equals(provinceCode))
@@ -233,8 +246,7 @@ public class ChinaRegionInitializer implements ApplicationRunner {
     }
 
     private String shortProvinceName(String name) {
-        return name
-                .replace("壮族自治区", "")
+        return name.replace("壮族自治区", "")
                 .replace("回族自治区", "")
                 .replace("维吾尔自治区", "")
                 .replace("自治区", "")

@@ -68,7 +68,8 @@ public class DevInventoryDataInitializer implements ApplicationRunner {
     private Set<Long> loadSeededRoomTypeIds() {
         List<InventoryCalendar> existing =
                 inventoryMapper.selectList(
-                        new LambdaQueryWrapper<InventoryCalendar>().select(InventoryCalendar::getRoomTypeId));
+                        new LambdaQueryWrapper<InventoryCalendar>()
+                                .select(InventoryCalendar::getRoomTypeId));
         Set<Long> ids = new HashSet<>();
         for (InventoryCalendar item : existing) {
             ids.add(item.getRoomTypeId());
