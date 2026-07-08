@@ -148,12 +148,14 @@ function applyFilter() {
 
 <template>
   <div class="page">
-    <van-nav-bar title="酒店列表" left-arrow @click-left="router.push('/')">
-      <template #right>
-        <span class="filter-btn" @click="showFilter = true">筛选</span>
-      </template>
-    </van-nav-bar>
-    <div class="summary">{{ searchSummary }}</div>
+    <div class="header-sticky">
+      <van-nav-bar title="酒店列表" left-arrow @click-left="router.push('/')">
+        <template #right>
+          <span class="filter-btn" @click="showFilter = true">筛选</span>
+        </template>
+      </van-nav-bar>
+      <div class="summary">{{ searchSummary }}</div>
+    </div>
     <van-list
       v-if="!firstLoading"
       v-model:loading="loading"
@@ -209,6 +211,13 @@ function applyFilter() {
   min-height: 100vh;
   background: #f7f8fa;
   padding-bottom: 16px;
+}
+
+.header-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #f7f8fa;
 }
 
 .summary {

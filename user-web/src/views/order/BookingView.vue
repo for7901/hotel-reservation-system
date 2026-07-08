@@ -6,7 +6,7 @@ import { getProfile } from '@/api/auth'
 import { fetchMyCoupons } from '@/api/coupon'
 import { fetchHotelDetail } from '@/api/hotel'
 import { checkAvailability, createOrder } from '@/api/order'
-import { isLoggedIn } from '@/utils/auth'
+import { getUser, isLoggedIn } from '@/utils/auth'
 import { defaultCheckIn, defaultCheckOut } from '@/utils/date'
 import { isMaskedPhone, isValidPhone } from '@/utils/error'
 import type { UserCoupon } from '@/api/coupon'
@@ -38,6 +38,14 @@ const guests = ref<OrderGuest[]>([createEmptyGuest()])
 
 function createEmptyGuest(): OrderGuest {
   return { name: '', phone: '', idCard: '' }
+}
+
+function resolveProfilePhone(): string {
+  const storedPhone = getUser()?.phone?.trim()
+  if (storedPhone && isValidPhone(storedPhone)) {
+    return storedPhone
+  }
+  return ''
 }
 
 const maxGuests = computed(() => selectedRoom.value?.maxGuests ?? 1)
@@ -123,9 +131,7 @@ onMounted(async () => {
       try {
         const [profile, myCoupons] = await Promise.all([getProfile(), fetchMyCoupons()])
         profileNickname.value = profile.nickname || ''
-        if (profile.phone && isValidPhone(profile.phone)) {
-          profilePhone.value = profile.phone
-        }
+        profilePhone.value = resolveProfilePhone()
         coupons.value = myCoupons
       } catch {
         // ignore
@@ -161,8 +167,9 @@ function fillPrimaryGuest() {
   if (profileNickname.value) {
     guests.value[0].name = profileNickname.value
   }
-  if (profilePhone.value) {
-    guests.value[0].phone = profilePhone.value
+  const phone = profilePhone.value || resolveProfilePhone()
+  if (phone) {
+    guests.value[0].phone = phone
   }
 }
 

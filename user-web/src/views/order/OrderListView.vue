@@ -8,6 +8,7 @@ import type { Order } from '@/types/order'
 
 const router = useRouter()
 const loading = ref(false)
+const fetching = ref(false)
 const orders = ref<Order[]>([])
 const finished = ref(false)
 const page = ref(1)
@@ -22,12 +23,15 @@ const tabs = [
 ]
 
 async function loadOrders(reset = false) {
+  if (fetching.value) return
+  fetching.value = true
+  if (reset) {
+    page.value = 1
+    orders.value = []
+    finished.value = false
+  }
+  loading.value = true
   try {
-    if (reset) {
-      page.value = 1
-      orders.value = []
-      finished.value = false
-    }
     const result = await fetchMyOrders({
       status: activeTab.value || undefined,
       page: page.value,
@@ -43,6 +47,7 @@ async function loadOrders(reset = false) {
     finished.value = true
   } finally {
     loading.value = false
+    fetching.value = false
     initialized.value = true
   }
 }
@@ -52,9 +57,9 @@ function onTabChange(name: string | number) {
   loadOrders(true)
 }
 
-onMounted(async () => {
-  await loadOrders(true)
+onMounted(() => {
   initialized.value = true
+  loadOrders(true)
 })
 </script>
 
@@ -68,6 +73,7 @@ onMounted(async () => {
       v-if="initialized"
       v-model:loading="loading"
       :finished="finished"
+      :immediate-check="false"
       finished-text="没有更多了"
       @load="loadOrders()"
     >

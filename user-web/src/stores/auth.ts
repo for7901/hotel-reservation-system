@@ -12,21 +12,24 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(data: LoginRequest) {
     const res = await loginApi(data)
-    saveAuth(res)
+    saveAuth(res, data.phone)
     return res
   }
 
   async function register(data: RegisterRequest) {
     const res = await registerApi(data)
-    saveAuth(res)
+    saveAuth(res, data.phone)
     return res
   }
 
-  function saveAuth(res: { token: string; userId: number; phone: string; nickname: string; role: string }) {
+  function saveAuth(
+    res: { token: string; userId: number; phone: string; nickname: string; role: string },
+    fullPhone?: string,
+  ) {
     token.value = res.token
     const storedUser: StoredUser = {
       userId: res.userId,
-      phone: res.phone,
+      phone: fullPhone || res.phone,
       nickname: res.nickname,
       role: res.role,
     }
