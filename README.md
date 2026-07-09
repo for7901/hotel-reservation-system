@@ -1,6 +1,6 @@
 # 酒店预订管理系统
 
-对标同程旅行酒店模块的 Java 全栈项目，包含用户端与管理端。
+对标同程旅行酒店模块的 Java 全栈项目，包含用户端、商家端与平台管理端。
 
 ## 架构概览
 
@@ -40,24 +40,48 @@ flowchart TB
 
 | 层级 | 技术 |
 |------|------|
-| 后端 | Spring Boot 4 · Java 17 · MyBatis-Plus · Spring Security |
+| 后端 | Spring Boot 4 · Java 17 · MyBatis-Plus · Spring Security · JWT |
 | 数据库 | MySQL 8 · Flyway · Redis 7 |
-| 管理端 | Vue 3 · Vite · Element Plus |
+| 管理端 | Vue 3 · Vite · Element Plus（管理员 / 商家共用，按角色显示菜单） |
 | 用户端 | Vue 3 · Vite · Vant |
 | 文档 | SpringDoc OpenAPI (Swagger UI) |
 | 工程化 | JUnit 5 · MockMvc · Spotless · Checkstyle · GitHub Actions · Docker |
+
+## 功能概览
+
+### 用户端
+- 首页搜索（省/市、入住离店日期、关键词）
+- 酒店列表（分页、星级筛选、价格排序）与酒店详情
+- 预订下单（入住人信息、优惠券抵扣、库存预扣）
+- 模拟支付、订单中心（取消 / 提前退订申请）
+- 评价、收藏、领券、个人资料与改密
+
+### 商家端（管理后台登录）
+- 经营看板、我的酒店 / 房型 / 库存日历
+- 订单处理（审核入住人、处理退订）
+- 评价回复
+
+### 平台管理端
+- 仪表盘、酒店入驻审核、全平台订单与用户管理
+- 评价展示控制、Banner、优惠券、操作日志
 
 ## 一键启动（Docker 全栈）
 
 启动 MySQL、Redis、后端应用与 Nginx 网关：
 
 ```bash
+# 先构建前端静态资源
+cd user-web && npm install && npm run build && cd ..
+cd admin-web && npm install && npm run build && cd ..
+
+# 启动全栈（需已有后端 jar，或按 Dockerfile 构建）
 docker compose up -d --build
 ```
 
 | 服务 | 说明 |
 |------|------|
-| Nginx | http://localhost （API 代理至 `/api/`） |
+| 用户端 | http://localhost |
+| 管理端 | http://localhost/admin/ （注意末尾斜杠） |
 | 健康检查 | http://localhost/api/health |
 | Swagger | http://localhost/api/swagger-ui.html |
 
@@ -106,7 +130,20 @@ cd admin-web && npm install && npm run dev
 
 用户端请自行注册，或使用 Swagger 调用 `POST /api/auth/register`。
 
-> API 返回的手机号已脱敏（中间四位 `****`），如 `138****0000`。
+> API 返回的手机号已脱敏（中间四位 `****`），如 `138****0000`。  
+> 「使用我的信息」填写入住人手机号时，需使用登录时输入的完整手机号（本地存储），重新登录后生效。
+
+## 核心订单状态
+
+```
+待支付(PENDING_PAYMENT)
+  → 已支付(PAID) → 商家审核入住人 → 已确认(CONFIRMED)
+  → 可申请提前退订 / 完成入住 → 评价
+```
+
+- 待支付可取消并释放库存  
+- 商家拒绝入住人审核会退款并释放库存  
+- 已确认订单可申请提前退订，由商家审核  
 
 ## 环境变量
 
@@ -154,7 +191,7 @@ REDIS_PORT=6379
 hotel-reservation-system/
 ├── src/                      # Spring Boot 后端
 ├── src/test/                 # 单元测试与 MockMvc 集成测试
-├── admin-web/                # 管理端前端
+├── admin-web/                # 管理端前端（管理员 + 商家）
 ├── user-web/                 # 用户端前端
 ├── docker/                   # Nginx 等 Docker 配置
 ├── config/checkstyle/        # Checkstyle 规则
@@ -165,6 +202,22 @@ hotel-reservation-system/
 └── .env.example
 ```
 
+## 云部署说明（可选）
+
+已支持 Docker 部署到云服务器，典型访问方式：
+
+| 入口 | 地址示例 |
+|------|----------|
+| 用户端 | `http://<公网IP>/` |
+| 管理端 | `http://<公网IP>/admin/` |
+| API | `http://<公网IP>/api/` |
+
+注意：
+
+1. 管理端请使用带尾斜杠的 `/admin/`，避免被当成用户端页面导致白屏  
+2. 前端需先 `npm run build`，将 `dist` 挂载到 Nginx  
+3. 数据库与本地开发库相互独立，修改本地数据不会同步到云端  
+
 ## 开发进度
 
 - [x] 第 0 周：工程骨架、统一返回、Swagger、双前端脚手架
@@ -174,7 +227,7 @@ hotel-reservation-system/
 - [x] 第 5–6 周：双端前端完善与联调
 - [x] 第 7 周：评价、收藏、Banner、优惠券、操作审计
 - [x] 第 8 周：工程化（测试/CI/Docker/脱敏/代码规范）
-- [ ] 第 9–10 周：部署与作品集
+- [x] 第 9 周：云服务器 Docker 部署与公网访问
 
 ### 第 8 周功能（工程化）
 
