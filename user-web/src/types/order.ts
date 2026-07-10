@@ -3,12 +3,13 @@ export interface Availability {
   nights: number
   totalPrice: number
   unitPrice: number
+  availableRooms?: number
   message: string
 }
 
 export interface OrderGuest {
   name: string
-  phone: string
+  phone?: string
   idCard?: string
 }
 
@@ -22,7 +23,8 @@ export interface OrderCreateRequest {
   roomTypeId: number
   checkInDate: string
   checkOutDate: string
-  guestCount: number
+  roomCount: number
+  contactPhone: string
   guests: OrderGuest[]
   userCouponId?: number
 }
@@ -38,6 +40,7 @@ export interface Order {
   checkOutDate: string
   nights: number
   guestCount: number
+  roomCount: number
   guestName: string
   guestPhone: string
   guests: OrderGuestInfo[]
@@ -52,6 +55,7 @@ export interface Order {
   refundAmount?: number | null
   refundPolicy?: string | null
   createdAt: string
+  reviewed?: boolean
 }
 
 export interface PageResult<T> {
@@ -63,11 +67,11 @@ export interface PageResult<T> {
 
 export const ORDER_STATUS: Record<string, string> = {
   PENDING_PAYMENT: '待支付',
-  PAID: '待审核',
-  CONFIRMED: '已确认',
-  CHECKOUT_PENDING: '退房申请中',
-  CHECKED_IN: '已入住',
-  COMPLETED: '已完成',
+  PAID: '待出行',
+  CONFIRMED: '待出行',
+  CHECKOUT_PENDING: '退款中',
+  CHECKED_IN: '待出行',
+  COMPLETED: '待点评',
   CANCELLED: '已取消',
   REFUNDING: '退款中',
   REFUNDED: '已退款',

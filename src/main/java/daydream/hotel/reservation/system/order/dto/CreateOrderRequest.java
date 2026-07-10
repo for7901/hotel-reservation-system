@@ -3,8 +3,10 @@ package daydream.hotel.reservation.system.order.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -23,9 +25,13 @@ public class CreateOrderRequest {
     @NotNull(message = "离店日期不能为空")
     private LocalDate checkOutDate;
 
-    @NotNull(message = "入住人数不能为空")
-    @Min(value = 1, message = "入住人数至少为1")
-    private Integer guestCount;
+    @NotNull(message = "预订间数不能为空")
+    @Min(value = 1, message = "预订间数至少为1")
+    private Integer roomCount;
+
+    @NotBlank(message = "联系手机号不能为空")
+    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
+    private String contactPhone;
 
     @NotEmpty(message = "入住人信息不能为空")
     @Valid
@@ -65,12 +71,29 @@ public class CreateOrderRequest {
         this.checkOutDate = checkOutDate;
     }
 
+    public Integer getRoomCount() {
+        return roomCount;
+    }
+
+    public void setRoomCount(Integer roomCount) {
+        this.roomCount = roomCount;
+    }
+
+    /** 兼容旧字段名：guestCount 视为预订间数 */
     public Integer getGuestCount() {
-        return guestCount;
+        return roomCount;
     }
 
     public void setGuestCount(Integer guestCount) {
-        this.guestCount = guestCount;
+        this.roomCount = guestCount;
+    }
+
+    public String getContactPhone() {
+        return contactPhone;
+    }
+
+    public void setContactPhone(String contactPhone) {
+        this.contactPhone = contactPhone;
     }
 
     public List<OrderGuestRequest> getGuests() {

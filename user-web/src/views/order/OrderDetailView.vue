@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
-import { cancelOrder, completeOrder, fetchOrderDetail, payOrder, applyCheckout } from '@/api/order'
+import { cancelOrder, deleteOrder, fetchOrderDetail, payOrder, applyCheckout } from '@/api/order'
 import { ORDER_STATUS } from '@/types/order'
 import type { Order } from '@/types/order'
 
@@ -12,8 +12,22 @@ const loading = ref(true)
 const paying = ref(false)
 const cancelling = ref(false)
 const applyingCheckout = ref(false)
-const completing = ref(false)
+const deleting = ref(false)
 const order = ref<Order | null>(null)
+
+const statusText = computed(() => {
+  if (!order.value) return ''
+  if (order.value.status === 'COMPLETED') {
+    return order.value.reviewed ? '已点评' : '待点评'
+  }
+  return ORDER_STATUS[order.value.status] || order.value.status
+})
+
+const canDelete = computed(() => {
+  if (!order.value) return false
+  const s = order.value.status
+  return s === 'COMPLETED' || s === 'CANCELLED' || s === 'REFUNDED' || s === 'REFUNDING'
+})
 
 onMounted(async () => {
   try {
@@ -30,7 +44,7 @@ async function handlePay() {
   paying.value = true
   try {
     order.value = await payOrder(order.value.id)
-    showSuccessToast('支付成功，等待酒店审核入住人信息')
+    showSuccessToast('支付成功')
   } catch (e) {
     showFailToast(e instanceof Error ? e.message : '支付失败')
   } finally {
@@ -74,25 +88,33 @@ async function handleApplyCheckout() {
   }
 }
 
-async function handleComplete() {
+async function handleDelete() {
   if (!order.value) return
   try {
-    await showConfirmDialog({ title: '确认已完成入住？' })
-    completing.value = true
-    order.value = await completeOrder(order.value.id)
-    showSuccessToast('订单已完成')
+    await showConfirmDialog({
+      title: '删除订单',
+      message: '删除后将不再显示在「我的订单」中，确定删除？',
+    })
+    deleting.value = true
+    await deleteOrder(order.value.id)
+    showSuccessToast('已删除')
+    router.replace('/orders')
   } catch (e) {
     if (e !== 'cancel') {
-      showFailToast(e instanceof Error ? e.message : '操作失败')
+      showFailToast(e instanceof Error ? e.message : '删除失败')
     }
   } finally {
-    completing.value = false
+    deleting.value = false
   }
 }
 
 function goReview() {
   if (!order.value) return
   router.push(`/orders/${order.value.id}/review`)
+}
+
+function roomLabel(index: number) {
+  return `房间 ${index + 1}`
 }
 </script>
 
@@ -105,13 +127,14 @@ function goReview() {
         <van-cell title="订单号" :value="order.orderNo" />
         <van-cell title="状态">
           <template #value>
-            <span :class="['status-text', order.status]">{{ ORDER_STATUS[order.status] || order.status }}</span>
+            <span :class="['status-text', order.status]">{{ statusText }}</span>
           </template>
         </van-cell>
         <van-cell title="酒店" :value="order.hotelName" />
         <van-cell title="房型" :value="order.roomTypeName" />
         <van-cell title="入住" :value="`${order.checkInDate} ~ ${order.checkOutDate}（${order.nights}晚）`" />
-        <van-cell title="入住人数" :value="`${order.guestCount} 人`" />
+        <van-cell title="预订间数" :value="`${order.roomCount || order.guestCount || 1} 间`" />
+        <van-cell title="联系电话" :value="order.guestPhone" />
         <van-cell title="总价" :value="`¥${order.totalAmount}`" />
         <van-cell v-if="order.discountAmount > 0" title="优惠" :value="`-¥${order.discountAmount}`" />
         <van-cell v-if="order.createdAt" title="下单时间" :value="order.createdAt" />
@@ -126,8 +149,8 @@ function goReview() {
         <van-cell
           v-for="(guest, index) in order.guests"
           :key="guest.id || index"
-          :title="`入住人 ${index + 1}`"
-          :label="[guest.name, guest.phone, guest.idCard].filter(Boolean).join(' · ')"
+          :title="roomLabel(index)"
+          :label="[guest.name, guest.idCard].filter(Boolean).join(' · ')"
         />
       </van-cell-group>
 
@@ -135,11 +158,8 @@ function goReview() {
         <van-button type="primary" block :loading="paying" @click="handlePay">模拟支付</van-button>
         <van-button block plain class="mt" :loading="cancelling" @click="handleCancel">取消订单</van-button>
       </div>
-      <div v-else-if="order.status === 'PAID'" class="actions">
-        <van-notice-bar text="酒店正在审核入住人信息，请耐心等待" />
-      </div>
-      <div v-else-if="order.status === 'CONFIRMED'" class="actions">
-        <van-button type="primary" block :loading="completing" @click="handleComplete">确认完成</van-button>
+      <div v-else-if="order.status === 'PAID' || order.status === 'CONFIRMED'" class="actions">
+        <van-button type="primary" block @click="router.push('/')">返回首页</van-button>
         <van-button block plain class="mt" type="warning" :loading="applyingCheckout" @click="handleApplyCheckout">
           申请退房
         </van-button>
@@ -151,11 +171,40 @@ function goReview() {
           :text="`退房申请处理中，预计退款 ¥${order.refundAmount ?? '-'}。${order.refundPolicy || ''}`"
         />
       </div>
-      <div v-else-if="order.status === 'COMPLETED'" class="actions">
+      <div v-else-if="order.status === 'COMPLETED' && !order.reviewed" class="actions">
         <van-button type="primary" block @click="goReview">去评价</van-button>
+        <van-button block plain type="danger" class="mt" :loading="deleting" @click="handleDelete">
+          删除订单
+        </van-button>
       </div>
-      <div v-else-if="order.status === 'REFUNDED'" class="actions">
-        <van-notice-bar color="#ed6a0c" background="#fffbe8" :text="`订单已退款${order.rejectReason ? '：' + order.rejectReason : ''}`" />
+      <div v-else-if="order.status === 'COMPLETED' && order.reviewed" class="actions">
+        <van-notice-bar color="#1989fa" background="#ecf9ff" text="您已评价过该订单" />
+        <van-button block plain type="danger" class="mt" :loading="deleting" @click="handleDelete">
+          删除订单
+        </van-button>
+      </div>
+      <div v-else-if="order.status === 'REFUNDED' || order.status === 'REFUNDING'" class="actions">
+        <van-notice-bar
+          color="#ed6a0c"
+          background="#fffbe8"
+          :text="`订单已退款${order.refundAmount != null ? ' ¥' + order.refundAmount : ''}${order.refundPolicy ? '。' + order.refundPolicy : ''}`"
+        />
+        <van-button block plain type="danger" class="mt" :loading="deleting" @click="handleDelete">
+          删除订单
+        </van-button>
+      </div>
+      <div v-else-if="order.status === 'CANCELLED'" class="actions">
+        <van-notice-bar
+          color="#969799"
+          background="#f7f8fa"
+          :text="`订单已取消${order.rejectReason ? '：' + order.rejectReason : ''}`"
+        />
+        <van-button block plain type="danger" class="mt" :loading="deleting" @click="handleDelete">
+          删除订单
+        </van-button>
+      </div>
+      <div v-else-if="canDelete" class="actions">
+        <van-button block plain type="danger" :loading="deleting" @click="handleDelete">删除订单</van-button>
       </div>
     </template>
   </div>
@@ -180,22 +229,17 @@ function goReview() {
   color: #ee0a24;
 }
 
-.status-text.PAID {
-  color: #ff976a;
-}
-
-.status-text.CONFIRMED {
-  color: #07c160;
-}
-
+.status-text.PAID,
+.status-text.CONFIRMED,
 .status-text.CHECKOUT_PENDING {
-  color: #ff976a;
+  color: #07c160;
 }
 
 .status-text.COMPLETED {
   color: #1989fa;
 }
 
+.status-text.CANCELLED,
 .status-text.REFUNDED {
   color: #969799;
 }

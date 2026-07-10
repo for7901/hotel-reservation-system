@@ -24,4 +24,13 @@ public class OrderTimeoutTask {
             log.info("Auto-cancelled {} expired pending-payment orders", count);
         }
     }
+
+    /** 离店日到达后，自动将已支付订单标记为已完成 */
+    @Scheduled(fixedDelayString = "${app.order.timeout-check-interval-ms:60000}")
+    public void autoCompleteDueOrders() {
+        int count = orderService.autoCompleteDueOrders();
+        if (count > 0) {
+            log.info("Auto-completed {} orders past check-out date", count);
+        }
+    }
 }

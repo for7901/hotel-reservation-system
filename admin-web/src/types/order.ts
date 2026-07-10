@@ -23,6 +23,7 @@ export interface Order {
   checkOutDate: string
   nights: number
   guestCount: number
+  roomCount?: number
   guestName: string
   guestPhone: string
   guests: OrderGuestInfo[]
@@ -47,12 +48,20 @@ export interface PageResult<T> {
 
 export const ORDER_STATUS: Record<string, string> = {
   PENDING_PAYMENT: '待支付',
-  PAID: '待审核',
-  CONFIRMED: '已确认',
-  CHECKOUT_PENDING: '退房申请中',
-  CHECKED_IN: '已入住',
+  PAID: '待出行',
+  CONFIRMED: '待出行',
+  CHECKOUT_PENDING: '待出行',
+  CHECKED_IN: '待出行',
   COMPLETED: '已完成',
   CANCELLED: '已取消',
-  REFUNDING: '退款中',
+  REFUNDING: '已退款',
   REFUNDED: '已退款',
 }
+
+/** 商家/管理端订单筛选：仅四种业务状态 */
+export const ORDER_STATUS_FILTERS = [
+  { value: 'PENDING_PAYMENT', label: '待支付' },
+  { value: 'UPCOMING', label: '待出行' },
+  { value: 'COMPLETED', label: '已完成' },
+  { value: 'REFUNDED', label: '已退款' },
+] as const

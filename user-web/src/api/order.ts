@@ -4,7 +4,12 @@ import type { Availability, Order, OrderCreateRequest } from '@/types/order'
 
 export function checkAvailability(
   hotelId: number,
-  params: { roomTypeId: number; checkInDate: string; checkOutDate: string }
+  params: {
+    roomTypeId: number
+    checkInDate: string
+    checkOutDate: string
+    roomCount?: number
+  },
 ): Promise<Availability> {
   return request.get(`/hotels/${hotelId}/availability`, { params }) as Promise<Availability>
 }
@@ -35,4 +40,8 @@ export function applyCheckout(id: number): Promise<Order> {
 
 export function completeOrder(id: number): Promise<Order> {
   return request.post(`/orders/${id}/complete`) as Promise<Order>
+}
+
+export function deleteOrder(id: number): Promise<void> {
+  return request.delete(`/orders/${id}`) as Promise<void>
 }

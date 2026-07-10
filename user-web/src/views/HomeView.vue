@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
 import { fetchBanners } from '@/api/banner'
 import { fetchCities, fetchProvinces } from '@/api/hotel'
 import RegionPicker from '@/components/RegionPicker.vue'
+import { useAuthStore } from '@/stores/auth'
+import { isLoggedIn } from '@/utils/auth'
 import { defaultCheckIn, defaultCheckOut } from '@/utils/date'
 import type { Banner } from '@/api/banner'
 import type { City, Province } from '@/types/hotel'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const provinces = ref<Province[]>([])
 const cities = ref<City[]>([])
 const banners = ref<Banner[]>([])
@@ -19,6 +22,9 @@ const keyword = ref('')
 const checkInDate = ref(defaultCheckIn())
 const checkOutDate = ref(defaultCheckOut())
 const showLocationPicker = ref(false)
+
+const loggedIn = computed(() => authStore.isLoggedIn)
+const displayName = computed(() => authStore.user?.nickname || '我的')
 
 onMounted(async () => {
   try {
@@ -40,21 +46,42 @@ async function onRegionConfirm(value: { provinceId?: number; cityId?: number }) 
   }
 }
 
+function buildSearchQuery() {
+  return {
+    ...(provinceId.value ? { provinceId: String(provinceId.value) } : {}),
+    ...(cityId.value ? { cityId: String(cityId.value) } : {}),
+    keyword: keyword.value || undefined,
+    checkInDate: checkInDate.value,
+    checkOutDate: checkOutDate.value,
+  }
+}
+
 function handleSearch() {
   if (checkOutDate.value <= checkInDate.value) {
     showFailToast('离店日期须晚于入住日期')
     return
   }
-  router.push({
-    path: '/hotels',
-    query: {
-      ...(provinceId.value ? { provinceId: String(provinceId.value) } : {}),
-      ...(cityId.value ? { cityId: String(cityId.value) } : {}),
-      keyword: keyword.value || undefined,
-      checkInDate: checkInDate.value,
-      checkOutDate: checkOutDate.value,
-    },
-  })
+  const query = buildSearchQuery()
+  if (!isLoggedIn()) {
+    const redirect = `/hotels?${new URLSearchParams(
+      Object.entries(query).filter(([, v]) => v != null) as [string, string][],
+    ).toString()}`
+    router.push({ path: '/login', query: { redirect } })
+    return
+  }
+  router.push({ path: '/hotels', query })
+}
+
+function goLogin() {
+  router.push({ path: '/login', query: { redirect: '/' } })
+}
+
+function goRegister() {
+  router.push({ path: '/register', query: { redirect: '/' } })
+}
+
+function goProfile() {
+  router.push('/profile')
 }
 
 function openBanner(linkUrl: string) {
@@ -77,7 +104,16 @@ const selectedLocationName = () => {
 
 <template>
   <div class="page">
-    <van-nav-bar title="酒店预订" />
+    <van-nav-bar title="酒店预订">
+      <template #right>
+        <div v-if="loggedIn" class="nav-auth" @click="goProfile">{{ displayName }}</div>
+        <div v-else class="nav-auth">
+          <span class="nav-link" @click="goLogin">登录</span>
+          <span class="nav-divider">|</span>
+          <span class="nav-link" @click="goRegister">注册</span>
+        </div>
+      </template>
+    </van-nav-bar>
     <van-swipe v-if="banners.length" class="banner-swipe" :autoplay="4000" indicator-color="#fff">
       <van-swipe-item v-for="item in banners" :key="item.id" @click="openBanner(item.linkUrl)">
         <img :src="item.imageUrl" class="banner-img" :alt="item.title" />
@@ -162,5 +198,21 @@ const selectedLocationName = () => {
 
 .action {
   margin: 24px 16px;
+}
+
+.nav-auth {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #1989fa;
+}
+
+.nav-link {
+  cursor: pointer;
+}
+
+.nav-divider {
+  color: #c8c9cc;
 }
 </style>

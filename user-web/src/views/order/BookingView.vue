@@ -27,17 +27,18 @@ const selectedCouponId = ref<number>()
 const showCouponPicker = ref(false)
 const profileNickname = ref('')
 const profilePhone = ref('')
+const contactPhone = ref('')
 
 const form = reactive({
   checkInDate: (route.query.checkInDate as string) || defaultCheckIn(),
   checkOutDate: (route.query.checkOutDate as string) || defaultCheckOut(),
-  guestCount: 1,
+  roomCount: 1,
 })
 
-const guests = ref<OrderGuest[]>([createEmptyGuest()])
+const rooms = ref<OrderGuest[]>([createEmptyRoom()])
 
-function createEmptyGuest(): OrderGuest {
-  return { name: '', phone: '', idCard: '' }
+function createEmptyRoom(): OrderGuest {
+  return { name: '', idCard: '' }
 }
 
 function resolveProfilePhone(): string {
@@ -48,7 +49,8 @@ function resolveProfilePhone(): string {
   return ''
 }
 
-const maxGuests = computed(() => selectedRoom.value?.maxGuests ?? 1)
+const maxGuestsPerRoom = computed(() => selectedRoom.value?.maxGuests ?? 2)
+const maxRooms = computed(() => Math.max(1, availability.value?.availableRooms ?? 10))
 
 const nights = computed(() => {
   if (!form.checkInDate || !form.checkOutDate) return 0
@@ -66,19 +68,18 @@ const payableAmount = computed(() => {
   return Math.max(0, total - selectedCoupon.value.amount)
 })
 
-const activeGuests = computed(() => guests.value.slice(0, form.guestCount))
+const activeRooms = computed(() => rooms.value.slice(0, form.roomCount))
 
-const guestsValid = computed(() =>
-  activeGuests.value.every((g) => g.name.trim() && isValidPhone(g.phone.trim()))
-)
+const roomsValid = computed(() => activeRooms.value.every((r) => r.name.trim().length > 0))
 
 const canSubmit = computed(
   () =>
     availability.value?.available === true &&
-    form.guestCount >= 1 &&
-    form.guestCount <= maxGuests.value &&
-    guests.value.length >= form.guestCount &&
-    guestsValid.value
+    form.roomCount >= 1 &&
+    form.roomCount <= maxRooms.value &&
+    rooms.value.length >= form.roomCount &&
+    roomsValid.value &&
+    isValidPhone(contactPhone.value.trim()),
 )
 
 const couponColumns = computed(() =>
@@ -88,7 +89,7 @@ const couponColumns = computed(() =>
       text: `${c.name}（满${c.minAmount}减${c.amount}）`,
       value: c.id,
       disabled: (availability.value?.totalPrice ?? 0) < c.minAmount,
-    }))
+    })),
 )
 
 const selectedCouponLabel = computed(() => {
@@ -100,38 +101,40 @@ const selectedCouponLabel = computed(() => {
 })
 
 watch(
-  () => form.guestCount,
+  () => form.roomCount,
   (count) => {
-    const safeCount = Math.min(Math.max(count, 1), maxGuests.value)
+    const safeCount = Math.min(Math.max(count, 1), maxRooms.value)
     if (safeCount !== count) {
-      form.guestCount = safeCount
+      form.roomCount = safeCount
       return
     }
-    while (guests.value.length < safeCount) {
-      guests.value.push(createEmptyGuest())
+    while (rooms.value.length < safeCount) {
+      rooms.value.push(createEmptyRoom())
     }
-    while (guests.value.length > safeCount) {
-      guests.value.pop()
+    while (rooms.value.length > safeCount) {
+      rooms.value.pop()
     }
+    refreshPrice()
   },
-  { immediate: true }
 )
 
-watch(maxGuests, (max) => {
-  if (form.guestCount > max) {
-    form.guestCount = max
+watch(maxRooms, (max) => {
+  if (form.roomCount > max) {
+    form.roomCount = max
   }
 })
 
 onMounted(async () => {
   try {
     hotel.value = await fetchHotelDetail(hotelId)
-    selectedRoom.value = hotel.value.roomTypes.find((r) => r.id === roomTypeId) || hotel.value.roomTypes[0] || null
+    selectedRoom.value =
+      hotel.value.roomTypes.find((r) => r.id === roomTypeId) || hotel.value.roomTypes[0] || null
     if (isLoggedIn()) {
       try {
         const [profile, myCoupons] = await Promise.all([getProfile(), fetchMyCoupons()])
         profileNickname.value = profile.nickname || ''
         profilePhone.value = resolveProfilePhone()
+        contactPhone.value = profilePhone.value
         coupons.value = myCoupons
       } catch {
         // ignore
@@ -148,7 +151,13 @@ onMounted(async () => {
 async function refreshPrice() {
   if (!selectedRoom.value || !form.checkInDate || !form.checkOutDate) return
   if (form.checkOutDate <= form.checkInDate) {
-    availability.value = { available: false, nights: 0, totalPrice: 0, unitPrice: 0, message: '离店日期须晚于入住日期' }
+    availability.value = {
+      available: false,
+      nights: 0,
+      totalPrice: 0,
+      unitPrice: 0,
+      message: '离店日期须晚于入住日期',
+    }
     return
   }
   try {
@@ -156,20 +165,27 @@ async function refreshPrice() {
       roomTypeId: selectedRoom.value.id,
       checkInDate: form.checkInDate,
       checkOutDate: form.checkOutDate,
+      roomCount: form.roomCount,
     })
   } catch (e) {
-    availability.value = { available: false, nights: 0, totalPrice: 0, unitPrice: 0, message: e instanceof Error ? e.message : '价格查询失败' }
+    availability.value = {
+      available: false,
+      nights: 0,
+      totalPrice: 0,
+      unitPrice: 0,
+      message: e instanceof Error ? e.message : '价格查询失败',
+    }
   }
 }
 
-function fillPrimaryGuest() {
-  if (!guests.value.length) return
+function fillPrimaryRoom() {
+  if (!rooms.value.length) return
   if (profileNickname.value) {
-    guests.value[0].name = profileNickname.value
+    rooms.value[0].name = profileNickname.value
   }
   const phone = profilePhone.value || resolveProfilePhone()
   if (phone) {
-    guests.value[0].phone = phone
+    contactPhone.value = phone
   }
 }
 
@@ -188,40 +204,34 @@ function clearCoupon() {
   showCouponPicker.value = false
 }
 
-function validateGuests(): boolean {
-  if (form.guestCount > maxGuests.value) {
-    showFailToast(`该房型最多可住 ${maxGuests.value} 人`)
+function validateRooms(): boolean {
+  if (form.roomCount > maxRooms.value) {
+    showFailToast(`当前最多可订 ${maxRooms.value} 间`)
     return false
   }
-  const list = activeGuests.value
-  if (list.length !== form.guestCount) {
-    showFailToast('入住人数与入住人信息数量不一致')
+  const list = activeRooms.value
+  if (list.length !== form.roomCount) {
+    showFailToast('预订间数与入住信息数量不一致')
     return false
   }
   for (let i = 0; i < list.length; i++) {
-    const guest = list[i]
-    if (!guest.name.trim()) {
-      showFailToast(`请填写入住人${i + 1}的姓名`)
+    if (!list[i].name.trim()) {
+      showFailToast(`请填写房间 ${i + 1} 的入住人姓名`)
       return false
     }
-    const phone = guest.phone.trim()
-    if (!isValidPhone(phone)) {
-      showFailToast(
-        isMaskedPhone(phone)
-          ? `入住人${i + 1}请填写完整手机号`
-          : `入住人${i + 1}手机号格式不正确`
-      )
-      return false
-    }
+  }
+  const phone = contactPhone.value.trim()
+  if (!isValidPhone(phone)) {
+    showFailToast(isMaskedPhone(phone) ? '请填写完整手机号' : '手机号格式不正确')
+    return false
   }
   return true
 }
 
 function buildGuestPayload() {
-  return activeGuests.value.map((g) => ({
-    name: g.name.trim(),
-    phone: g.phone.trim(),
-    idCard: g.idCard?.trim() || undefined,
+  return activeRooms.value.map((r) => ({
+    name: r.name.trim(),
+    idCard: r.idCard?.trim() || undefined,
   }))
 }
 
@@ -234,7 +244,7 @@ async function handleSubmit() {
     showFailToast('请选择房型')
     return
   }
-  if (!validateGuests()) return
+  if (!validateRooms()) return
   if (!canSubmit.value) {
     showFailToast(availability.value?.message || '当前不可预订')
     return
@@ -251,7 +261,8 @@ async function handleSubmit() {
       roomTypeId: selectedRoom.value.id,
       checkInDate: form.checkInDate,
       checkOutDate: form.checkOutDate,
-      guestCount: form.guestCount,
+      roomCount: form.roomCount,
+      contactPhone: contactPhone.value.trim(),
       guests: buildGuestPayload(),
       userCouponId: selectedCouponId.value,
     })
@@ -271,39 +282,80 @@ async function handleSubmit() {
     <van-skeleton v-if="loading" title :row="5" style="padding: 16px" />
     <template v-else-if="hotel && selectedRoom">
       <van-cell-group inset title="酒店信息">
-        <van-cell :title="hotel.name" :label="`${selectedRoom.name}（最多可住 ${maxGuests} 人）`" />
+        <van-cell
+          :title="hotel.name"
+          :label="`${selectedRoom.name}（每间最多可住 ${maxGuestsPerRoom} 人）`"
+        />
       </van-cell-group>
       <van-cell-group inset title="入住信息">
         <van-field v-model="form.checkInDate" label="入住" type="date" @change="refreshPrice" />
         <van-field v-model="form.checkOutDate" label="离店" type="date" @change="refreshPrice" />
         <van-cell title="晚数" :value="`${nights} 晚`" />
-        <van-cell title="原价" :value="availability?.available ? `¥${availability.totalPrice}` : availability?.message" />
-        <van-cell
-          title="优惠券"
-          :value="selectedCouponLabel"
-          is-link
-          @click="showCouponPicker = true"
-        />
-        <van-cell v-if="selectedCoupon && payableAmount < (availability?.totalPrice ?? 0)" title="实付" :value="`¥${payableAmount}`" />
-        <van-field label="入住人数">
+        <van-field label="预订间数">
           <template #input>
-            <van-stepper v-model="form.guestCount" :min="1" :max="maxGuests" integer />
+            <div class="room-stepper">
+              <span v-if="availability?.availableRooms != null" class="stock-tip">
+                仅剩{{ availability.availableRooms }}间
+              </span>
+              <van-stepper
+                v-model="form.roomCount"
+                :min="1"
+                :max="maxRooms"
+                integer
+                @change="refreshPrice"
+              />
+            </div>
           </template>
         </van-field>
+        <van-cell
+          title="原价"
+          :value="availability?.available ? `¥${availability.totalPrice}` : availability?.message"
+        />
+        <van-cell title="优惠券" :value="selectedCouponLabel" is-link @click="showCouponPicker = true" />
+        <van-cell
+          v-if="selectedCoupon && payableAmount < (availability?.totalPrice ?? 0)"
+          title="实付"
+          :value="`¥${payableAmount}`"
+        />
       </van-cell-group>
 
-      <van-cell-group v-for="(_, index) in activeGuests" :key="index" inset :title="`入住人 ${index + 1}`">
-        <van-field v-model="guests[index].name" label="姓名" placeholder="请输入姓名" />
-        <van-field v-model="guests[index].phone" label="手机号" type="tel" maxlength="11" placeholder="请输入11位手机号" />
-        <van-field v-model="guests[index].idCard" label="身份证" maxlength="18" placeholder="选填" />
+      <van-cell-group
+        v-for="(_, index) in activeRooms"
+        :key="index"
+        inset
+        :title="`房间 ${index + 1}`"
+      >
+        <van-field
+          v-model="rooms[index].name"
+          label="住客姓名"
+          placeholder="可填写多人，如：张三、李四"
+        />
+        <van-field
+          v-model="rooms[index].idCard"
+          label="身份证"
+          maxlength="18"
+          placeholder="选填"
+        />
         <van-cell v-if="index === 0 && (profileNickname || profilePhone)">
-          <van-button size="small" type="primary" plain block @click="fillPrimaryGuest">使用我的信息</van-button>
+          <van-button size="small" type="primary" plain block @click="fillPrimaryRoom">
+            使用我的信息
+          </van-button>
         </van-cell>
+      </van-cell-group>
+
+      <van-cell-group inset title="联系方式">
+        <van-field
+          v-model="contactPhone"
+          label="手机号"
+          type="tel"
+          maxlength="11"
+          placeholder="请输入11位手机号"
+        />
       </van-cell-group>
 
       <div class="policy">
         <p>退改说明：入住前 24 小时可免费取消；超时取消可能收取首晚房费。</p>
-        <p>支付成功后，酒店将审核入住人信息，审核通过后订单生效。</p>
+        <p>支付成功后订单立即生效，无需商家审核。</p>
       </div>
       <div class="action">
         <van-button type="primary" block :loading="submitting" :disabled="!canSubmit" @click="handleSubmit">
@@ -326,6 +378,19 @@ async function handleSubmit() {
   min-height: 100vh;
   background: #f7f8fa;
   padding-bottom: 24px;
+}
+
+.room-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+}
+
+.stock-tip {
+  color: #ff976a;
+  font-size: 12px;
 }
 
 .policy {

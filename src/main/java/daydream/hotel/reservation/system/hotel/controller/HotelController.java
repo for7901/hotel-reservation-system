@@ -84,8 +84,10 @@ public class HotelController {
             @PathVariable Long id,
             @RequestParam Long roomTypeId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkInDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOutDate) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOutDate,
+            @RequestParam(required = false, defaultValue = "1") Integer roomCount) {
         return Result.ok(
-                inventoryService.checkAvailability(id, roomTypeId, checkInDate, checkOutDate));
+                inventoryService.checkAvailability(
+                        id, roomTypeId, checkInDate, checkOutDate, roomCount));
     }
 }

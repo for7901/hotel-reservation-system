@@ -76,17 +76,17 @@ class InventoryServiceTest {
 
     @Test
     void reserveInventoryShouldDecrementEachStayDate() {
-        when(inventoryMapper.decrementStock(any(), any())).thenReturn(1);
+        when(inventoryMapper.decrementStock(any(), any(), eq(1))).thenReturn(1);
 
         inventoryService.reserveInventory(roomType.getId(), checkIn, checkOut);
 
-        verify(inventoryMapper).decrementStock(eq(1L), eq("2026-08-01"));
-        verify(inventoryMapper).decrementStock(eq(1L), eq("2026-08-02"));
+        verify(inventoryMapper).decrementStock(eq(1L), eq("2026-08-01"), eq(1));
+        verify(inventoryMapper).decrementStock(eq(1L), eq("2026-08-02"), eq(1));
     }
 
     @Test
     void reserveInventoryShouldFailWhenDecrementReturnsZero() {
-        when(inventoryMapper.decrementStock(any(), any())).thenReturn(0);
+        when(inventoryMapper.decrementStock(any(), any(), eq(1))).thenReturn(0);
 
         assertThrows(
                 BusinessException.class,
@@ -97,8 +97,8 @@ class InventoryServiceTest {
     void releaseInventoryShouldIncrementEachStayDate() {
         inventoryService.releaseInventory(roomType.getId(), checkIn, checkOut);
 
-        verify(inventoryMapper).incrementStock(eq(1L), eq("2026-08-01"));
-        verify(inventoryMapper).incrementStock(eq(1L), eq("2026-08-02"));
+        verify(inventoryMapper).incrementStock(eq(1L), eq("2026-08-01"), eq(1));
+        verify(inventoryMapper).incrementStock(eq(1L), eq("2026-08-02"), eq(1));
     }
 
     @Test

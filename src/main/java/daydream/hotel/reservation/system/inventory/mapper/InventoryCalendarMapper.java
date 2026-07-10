@@ -10,12 +10,18 @@ import org.apache.ibatis.annotations.Update;
 public interface InventoryCalendarMapper extends BaseMapper<InventoryCalendar> {
 
     @Update(
-            "UPDATE inventory_calendar SET available_rooms = available_rooms - 1, updated_at = NOW() "
-                    + "WHERE room_type_id = #{roomTypeId} AND inv_date = #{invDate} AND available_rooms > 0")
-    int decrementStock(@Param("roomTypeId") Long roomTypeId, @Param("invDate") String invDate);
+            "UPDATE inventory_calendar SET available_rooms = available_rooms - #{quantity}, updated_at = NOW() "
+                    + "WHERE room_type_id = #{roomTypeId} AND inv_date = #{invDate} AND available_rooms >= #{quantity}")
+    int decrementStock(
+            @Param("roomTypeId") Long roomTypeId,
+            @Param("invDate") String invDate,
+            @Param("quantity") int quantity);
 
     @Update(
-            "UPDATE inventory_calendar SET available_rooms = available_rooms + 1, updated_at = NOW() "
+            "UPDATE inventory_calendar SET available_rooms = available_rooms + #{quantity}, updated_at = NOW() "
                     + "WHERE room_type_id = #{roomTypeId} AND inv_date = #{invDate}")
-    int incrementStock(@Param("roomTypeId") Long roomTypeId, @Param("invDate") String invDate);
+    int incrementStock(
+            @Param("roomTypeId") Long roomTypeId,
+            @Param("invDate") String invDate,
+            @Param("quantity") int quantity);
 }

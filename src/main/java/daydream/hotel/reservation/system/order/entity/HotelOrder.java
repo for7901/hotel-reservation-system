@@ -23,6 +23,7 @@ public class HotelOrder {
     private LocalDate checkOutDate;
     private Integer nights;
     private Integer guestCount;
+    private Integer roomCount;
     private String guestName;
     private String guestPhone;
     private BigDecimal unitPrice;
@@ -33,6 +34,7 @@ public class HotelOrder {
     private String rejectReason;
     private LocalDateTime paidAt;
     private LocalDateTime cancelledAt;
+    private LocalDateTime userDeletedAt;
     private LocalDateTime checkoutApplyAt;
     private BigDecimal refundAmount;
     private String refundPolicy;
@@ -127,6 +129,14 @@ public class HotelOrder {
         this.guestCount = guestCount;
     }
 
+    public Integer getRoomCount() {
+        return roomCount;
+    }
+
+    public void setRoomCount(Integer roomCount) {
+        this.roomCount = roomCount;
+    }
+
     public String getGuestName() {
         return guestName;
     }
@@ -205,6 +215,14 @@ public class HotelOrder {
 
     public void setCancelledAt(LocalDateTime cancelledAt) {
         this.cancelledAt = cancelledAt;
+    }
+
+    public LocalDateTime getUserDeletedAt() {
+        return userDeletedAt;
+    }
+
+    public void setUserDeletedAt(LocalDateTime userDeletedAt) {
+        this.userDeletedAt = userDeletedAt;
     }
 
     public LocalDateTime getCheckoutApplyAt() {

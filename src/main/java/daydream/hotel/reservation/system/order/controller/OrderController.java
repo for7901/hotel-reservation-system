@@ -8,6 +8,7 @@ import daydream.hotel.reservation.system.order.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -70,5 +71,12 @@ public class OrderController {
     @PostMapping("/{id}/complete")
     public Result<OrderVO> complete(@PathVariable Long id) {
         return Result.ok(orderService.completeOrder(id));
+    }
+
+    @Operation(summary = "删除订单（用户端软删除）")
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        orderService.deleteMyOrder(id);
+        return Result.ok();
     }
 }

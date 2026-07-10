@@ -25,6 +25,7 @@ import daydream.hotel.reservation.system.order.entity.OrderGuest;
 import daydream.hotel.reservation.system.order.enums.OrderStatus;
 import daydream.hotel.reservation.system.order.mapper.HotelOrderMapper;
 import daydream.hotel.reservation.system.order.mapper.OrderGuestMapper;
+import daydream.hotel.reservation.system.review.mapper.HotelReviewMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -59,6 +60,8 @@ class OrderServiceTest {
 
     @Mock private TransactionTemplate transactionTemplate;
 
+    @Mock private HotelReviewMapper hotelReviewMapper;
+
     @InjectMocks private OrderService orderService;
 
     private CreateOrderRequest request;
@@ -76,14 +79,14 @@ class OrderServiceTest {
 
         OrderGuestRequest guest = new OrderGuestRequest();
         guest.setName("张三");
-        guest.setPhone("13900001111");
 
         request = new CreateOrderRequest();
         request.setHotelId(1L);
         request.setRoomTypeId(2L);
         request.setCheckInDate(LocalDate.now().plusDays(1));
         request.setCheckOutDate(LocalDate.now().plusDays(2));
-        request.setGuestCount(1);
+        request.setRoomCount(1);
+        request.setContactPhone("13900001111");
         request.setGuests(List.of(guest));
 
         hotel = new Hotel();
@@ -107,10 +110,10 @@ class OrderServiceTest {
     void createOrderShouldReserveInventoryAndPersistOrder() {
         when(hotelMapper.selectById(1L)).thenReturn(hotel);
         when(roomTypeMapper.selectOne(any())).thenReturn(roomType);
-        when(inventoryService.calculatePrice(any(), any(), any()))
+        when(inventoryService.calculatePrice(any(), any(), any(), org.mockito.ArgumentMatchers.eq(1)))
                 .thenReturn(
                         new InventoryService.PriceSummary(
-                                1, new BigDecimal("299.00"), new BigDecimal("299.00")));
+                                1, new BigDecimal("299.00"), new BigDecimal("299.00"), 5));
         when(couponService.applyDiscount(null, 100L, new BigDecimal("299.00")))
                 .thenReturn(
                         new CouponService.DiscountResult(
@@ -119,14 +122,15 @@ class OrderServiceTest {
         OrderVO vo = orderService.createOrder(request);
 
         verify(inventoryService)
-                .reserveInventory(2L, request.getCheckInDate(), request.getCheckOutDate());
+                .reserveInventory(
+                        2L, request.getCheckInDate(), request.getCheckOutDate(), 1);
         verify(orderGuestMapper).insert(org.mockito.ArgumentMatchers.<OrderGuest>any());
 
         ArgumentCaptor<HotelOrder> captor = ArgumentCaptor.forClass(HotelOrder.class);
         verify(orderMapper).insert(captor.capture());
         HotelOrder saved = captor.getValue();
         assertEquals(100L, saved.getUserId());
-        assertEquals(1, saved.getGuestCount());
+        assertEquals(1, saved.getRoomCount());
         assertEquals(OrderStatus.PENDING_PAYMENT.name(), saved.getStatus());
         assertEquals(0, saved.getTotalAmount().compareTo(new BigDecimal("299.00")));
 
@@ -135,19 +139,9 @@ class OrderServiceTest {
     }
 
     @Test
-    void createOrderShouldRejectGuestCountExceedingMaxGuests() {
-        request.setGuestCount(3);
-        OrderGuestRequest guest2 = new OrderGuestRequest();
-        guest2.setName("李四");
-        guest2.setPhone("13900002222");
-        OrderGuestRequest guest3 = new OrderGuestRequest();
-        guest3.setName("王五");
-        guest3.setPhone("13900003333");
-        request.setGuests(List.of(request.getGuests().get(0), guest2, guest3));
-
-        when(hotelMapper.selectById(1L)).thenReturn(hotel);
-        when(roomTypeMapper.selectOne(any())).thenReturn(roomType);
-
+    void createOrderShouldRejectGuestInfoMismatch() {
+        request.setRoomCount(2);
+        // only 1 guest provided
         assertThrows(BusinessException.class, () -> orderService.createOrder(request));
     }
 

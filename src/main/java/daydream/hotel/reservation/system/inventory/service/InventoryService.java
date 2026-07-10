@@ -83,7 +83,13 @@ public class InventoryService {
 
     public AvailabilityVO checkAvailability(
             Long hotelId, Long roomTypeId, LocalDate checkIn, LocalDate checkOut) {
+        return checkAvailability(hotelId, roomTypeId, checkIn, checkOut, 1);
+    }
+
+    public AvailabilityVO checkAvailability(
+            Long hotelId, Long roomTypeId, LocalDate checkIn, LocalDate checkOut, int roomCount) {
         AvailabilityVO vo = new AvailabilityVO();
+        int quantity = Math.max(roomCount, 1);
         if (!checkIn.isBefore(checkOut)) {
             vo.setAvailable(false);
             vo.setMessage("离店日期必须晚于入住日期");
@@ -115,11 +121,12 @@ public class InventoryService {
         }
 
         try {
-            PriceSummary summary = calculatePrice(roomType, checkIn, checkOut);
+            PriceSummary summary = calculatePrice(roomType, checkIn, checkOut, quantity);
             vo.setAvailable(true);
             vo.setNights(summary.nights());
             vo.setTotalPrice(summary.totalPrice());
             vo.setUnitPrice(summary.unitPrice());
+            vo.setAvailableRooms(summary.availableRooms());
             vo.setMessage("可预订");
         } catch (BusinessException ex) {
             vo.setAvailable(false);
@@ -129,28 +136,49 @@ public class InventoryService {
     }
 
     public PriceSummary calculatePrice(RoomType roomType, LocalDate checkIn, LocalDate checkOut) {
+        return calculatePrice(roomType, checkIn, checkOut, 1);
+    }
+
+    public PriceSummary calculatePrice(
+            RoomType roomType, LocalDate checkIn, LocalDate checkOut, int roomCount) {
+        int quantity = Math.max(roomCount, 1);
         List<LocalDate> dates = getStayDates(checkIn, checkOut);
         BigDecimal total = BigDecimal.ZERO;
+        int minAvailable = Integer.MAX_VALUE;
         for (LocalDate date : dates) {
             InventoryCalendar inv =
                     inventoryMapper.selectOne(
                             new LambdaQueryWrapper<InventoryCalendar>()
                                     .eq(InventoryCalendar::getRoomTypeId, roomType.getId())
                                     .eq(InventoryCalendar::getInvDate, date));
-            if (inv == null || inv.getAvailableRooms() == null || inv.getAvailableRooms() <= 0) {
+            if (inv == null
+                    || inv.getAvailableRooms() == null
+                    || inv.getAvailableRooms() < quantity) {
                 throw new BusinessException(ErrorCode.INSUFFICIENT_INVENTORY);
             }
-            total = total.add(inv.getPrice());
+            minAvailable = Math.min(minAvailable, inv.getAvailableRooms());
+            total = total.add(inv.getPrice().multiply(BigDecimal.valueOf(quantity)));
         }
         BigDecimal unitPrice =
-                total.divide(BigDecimal.valueOf(dates.size()), 2, RoundingMode.HALF_UP);
-        return new PriceSummary(dates.size(), total, unitPrice);
+                total.divide(
+                        BigDecimal.valueOf((long) dates.size() * quantity),
+                        2,
+                        RoundingMode.HALF_UP);
+        return new PriceSummary(dates.size(), total, unitPrice, minAvailable);
     }
 
     @Transactional
     public void reserveInventory(Long roomTypeId, LocalDate checkIn, LocalDate checkOut) {
+        reserveInventory(roomTypeId, checkIn, checkOut, 1);
+    }
+
+    @Transactional
+    public void reserveInventory(
+            Long roomTypeId, LocalDate checkIn, LocalDate checkOut, int roomCount) {
+        int quantity = Math.max(roomCount, 1);
         for (LocalDate date : getStayDates(checkIn, checkOut)) {
-            int updated = inventoryMapper.decrementStock(roomTypeId, date.toString());
+            int updated =
+                    inventoryMapper.decrementStock(roomTypeId, date.toString(), quantity);
             if (updated == 0) {
                 throw new BusinessException(ErrorCode.INSUFFICIENT_INVENTORY);
             }
@@ -159,8 +187,15 @@ public class InventoryService {
 
     @Transactional
     public void releaseInventory(Long roomTypeId, LocalDate checkIn, LocalDate checkOut) {
+        releaseInventory(roomTypeId, checkIn, checkOut, 1);
+    }
+
+    @Transactional
+    public void releaseInventory(
+            Long roomTypeId, LocalDate checkIn, LocalDate checkOut, int roomCount) {
+        int quantity = Math.max(roomCount, 1);
         for (LocalDate date : getStayDates(checkIn, checkOut)) {
-            inventoryMapper.incrementStock(roomTypeId, date.toString());
+            inventoryMapper.incrementStock(roomTypeId, date.toString(), quantity);
         }
     }
 
@@ -193,5 +228,10 @@ public class InventoryService {
         return vo;
     }
 
-    public record PriceSummary(int nights, BigDecimal totalPrice, BigDecimal unitPrice) {}
+    public record PriceSummary(
+            int nights, BigDecimal totalPrice, BigDecimal unitPrice, int availableRooms) {
+        public PriceSummary(int nights, BigDecimal totalPrice, BigDecimal unitPrice) {
+            this(nights, totalPrice, unitPrice, 0);
+        }
+    }
 }

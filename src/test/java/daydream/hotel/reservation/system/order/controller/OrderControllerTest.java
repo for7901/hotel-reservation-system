@@ -150,10 +150,10 @@ class OrderControllerTest {
         request.setRoomTypeId(roomTypeId);
         request.setCheckInDate(checkIn);
         request.setCheckOutDate(checkOut);
-        request.setGuestCount(1);
+        request.setRoomCount(1);
+        request.setContactPhone("13900003333");
         OrderGuestRequest guest = new OrderGuestRequest();
         guest.setName("张三");
-        guest.setPhone("13900003333");
         request.setGuests(List.of(guest));
 
         MvcResult createResult =
@@ -165,7 +165,7 @@ class OrderControllerTest {
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.code").value(0))
                         .andExpect(jsonPath("$.data.status").value("PENDING_PAYMENT"))
-                        .andExpect(jsonPath("$.data.guestCount").value(1))
+                        .andExpect(jsonPath("$.data.roomCount").value(1))
                         .andExpect(jsonPath("$.data.guests[0].name").value("张三"))
                         .andExpect(jsonPath("$.data.guestPhone").value("139****3333"))
                         .andReturn();
@@ -195,23 +195,17 @@ class OrderControllerTest {
     }
 
     @Test
-    void createOrderShouldRejectGuestCountExceedingMaxGuests() throws Exception {
+    void createOrderShouldRejectGuestInfoMismatch() throws Exception {
         CreateOrderRequest request = new CreateOrderRequest();
         request.setHotelId(hotelId);
         request.setRoomTypeId(roomTypeId);
         request.setCheckInDate(checkIn);
         request.setCheckOutDate(checkOut);
-        request.setGuestCount(3);
+        request.setRoomCount(2);
+        request.setContactPhone("13900003333");
         OrderGuestRequest guest1 = new OrderGuestRequest();
         guest1.setName("张三");
-        guest1.setPhone("13900003333");
-        OrderGuestRequest guest2 = new OrderGuestRequest();
-        guest2.setName("李四");
-        guest2.setPhone("13900003334");
-        OrderGuestRequest guest3 = new OrderGuestRequest();
-        guest3.setName("王五");
-        guest3.setPhone("13900003335");
-        request.setGuests(List.of(guest1, guest2, guest3));
+        request.setGuests(List.of(guest1));
 
         mockMvc.perform(
                         post("/orders")
@@ -219,6 +213,6 @@ class OrderControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(2006));
+                .andExpect(jsonPath("$.code").value(2007));
     }
 }

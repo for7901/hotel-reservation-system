@@ -18,6 +18,7 @@ public class OrderVO {
     private LocalDate checkOutDate;
     private Integer nights;
     private Integer guestCount;
+    private Integer roomCount;
     private String guestName;
     private String guestPhone;
     private BigDecimal unitPrice;
@@ -31,6 +32,7 @@ public class OrderVO {
     private BigDecimal refundAmount;
     private String refundPolicy;
     private LocalDateTime createdAt;
+    private Boolean reviewed;
     private List<OrderGuestVO> guests;
 
     public Long getId() {
@@ -111,6 +113,14 @@ public class OrderVO {
 
     public void setGuestCount(Integer guestCount) {
         this.guestCount = guestCount;
+    }
+
+    public Integer getRoomCount() {
+        return roomCount;
+    }
+
+    public void setRoomCount(Integer roomCount) {
+        this.roomCount = roomCount;
     }
 
     public String getGuestName() {
@@ -216,6 +226,14 @@ public class OrderVO {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Boolean getReviewed() {
+        return reviewed;
+    }
+
+    public void setReviewed(Boolean reviewed) {
+        this.reviewed = reviewed;
     }
 
     public List<OrderGuestVO> getGuests() {

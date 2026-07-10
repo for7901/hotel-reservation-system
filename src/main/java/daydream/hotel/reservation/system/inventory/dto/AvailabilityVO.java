@@ -9,6 +9,7 @@ public class AvailabilityVO {
     private BigDecimal totalPrice;
     private BigDecimal unitPrice;
     private String message;
+    private Integer availableRooms;
 
     public boolean isAvailable() {
         return available;
@@ -48,5 +49,13 @@ public class AvailabilityVO {
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public Integer getAvailableRooms() {
+        return availableRooms;
+    }
+
+    public void setAvailableRooms(Integer availableRooms) {
+        this.availableRooms = availableRooms;
     }
 }

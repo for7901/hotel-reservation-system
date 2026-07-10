@@ -109,16 +109,25 @@ public class DashboardService {
     }
 
     private BigDecimal sumRevenueSince(LocalDateTime start, List<Long> hotelIds) {
+        LocalDateTime dayEnd = LocalDate.now().plusDays(1).atStartOfDay();
+        // 今日营收：按支付时间统计；排除未支付、取消支付、退款中/已退款
         LambdaQueryWrapper<HotelOrder> wrapper =
                 new LambdaQueryWrapper<HotelOrder>()
-                        .ge(HotelOrder::getCreatedAt, start)
-                        .lt(HotelOrder::getCreatedAt, LocalDate.now().plusDays(1).atStartOfDay())
-                        .ne(HotelOrder::getStatus, OrderStatus.CANCELLED.name());
+                        .ge(HotelOrder::getPaidAt, start)
+                        .lt(HotelOrder::getPaidAt, dayEnd)
+                        .notIn(
+                                HotelOrder::getStatus,
+                                List.of(
+                                        OrderStatus.PENDING_PAYMENT.name(),
+                                        OrderStatus.CANCELLED.name(),
+                                        OrderStatus.REFUNDING.name(),
+                                        OrderStatus.REFUNDED.name()));
         if (hotelIds != null) {
             wrapper.in(HotelOrder::getHotelId, hotelIds);
         }
         return orderMapper.selectList(wrapper).stream()
                 .map(HotelOrder::getTotalAmount)
+                .filter(amount -> amount != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 

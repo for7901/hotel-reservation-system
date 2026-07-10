@@ -25,9 +25,13 @@ import daydream.hotel.reservation.system.order.entity.OrderGuest;
 import daydream.hotel.reservation.system.order.enums.OrderStatus;
 import daydream.hotel.reservation.system.order.mapper.HotelOrderMapper;
 import daydream.hotel.reservation.system.order.mapper.OrderGuestMapper;
+import daydream.hotel.reservation.system.review.entity.HotelReview;
+import daydream.hotel.reservation.system.review.mapper.HotelReviewMapper;
 import daydream.hotel.reservation.system.user.enums.UserRole;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -50,6 +54,7 @@ public class OrderService {
     private final CouponService couponService;
     private final AppProperties appProperties;
     private final TransactionTemplate transactionTemplate;
+    private final HotelReviewMapper hotelReviewMapper;
 
     public OrderService(
             HotelOrderMapper orderMapper,
@@ -59,7 +64,8 @@ public class OrderService {
             InventoryService inventoryService,
             CouponService couponService,
             AppProperties appProperties,
-            TransactionTemplate transactionTemplate) {
+            TransactionTemplate transactionTemplate,
+            HotelReviewMapper hotelReviewMapper) {
         this.orderMapper = orderMapper;
         this.orderGuestMapper = orderGuestMapper;
         this.hotelMapper = hotelMapper;
@@ -68,6 +74,7 @@ public class OrderService {
         this.couponService = couponService;
         this.appProperties = appProperties;
         this.transactionTemplate = transactionTemplate;
+        this.hotelReviewMapper = hotelReviewMapper;
     }
 
     @Transactional
@@ -77,6 +84,7 @@ public class OrderService {
             throw new BusinessException(ErrorCode.INVALID_DATE_RANGE);
         }
         validateGuestInfo(request);
+        int roomCount = request.getRoomCount();
 
         Hotel hotel = hotelMapper.selectById(request.getHotelId());
         if (hotel == null || !HotelStatus.APPROVED.name().equals(hotel.getStatus())) {
@@ -92,15 +100,15 @@ public class OrderService {
         if (roomType == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
-        if (request.getGuestCount() > roomType.getMaxGuests()) {
-            throw new BusinessException(ErrorCode.GUEST_COUNT_EXCEEDED);
-        }
 
         InventoryService.PriceSummary priceSummary =
                 inventoryService.calculatePrice(
-                        roomType, request.getCheckInDate(), request.getCheckOutDate());
+                        roomType, request.getCheckInDate(), request.getCheckOutDate(), roomCount);
         inventoryService.reserveInventory(
-                roomType.getId(), request.getCheckInDate(), request.getCheckOutDate());
+                roomType.getId(),
+                request.getCheckInDate(),
+                request.getCheckOutDate(),
+                roomCount);
 
         CouponService.DiscountResult discount =
                 couponService.applyDiscount(
@@ -118,16 +126,17 @@ public class OrderService {
         order.setCheckInDate(request.getCheckInDate());
         order.setCheckOutDate(request.getCheckOutDate());
         order.setNights(priceSummary.nights());
-        order.setGuestCount(request.getGuestCount());
-        order.setGuestName(primaryGuest.getName());
-        order.setGuestPhone(primaryGuest.getPhone());
+        order.setRoomCount(roomCount);
+        order.setGuestCount(request.getGuests().size());
+        order.setGuestName(primaryGuest.getName().trim());
+        order.setGuestPhone(request.getContactPhone().trim());
         order.setUnitPrice(priceSummary.unitPrice());
         order.setDiscountAmount(discount.discountAmount());
         order.setCouponId(discount.userCouponId());
         order.setTotalAmount(discount.payAmount());
         order.setStatus(OrderStatus.PENDING_PAYMENT.name());
         orderMapper.insert(order);
-        saveOrderGuests(order.getId(), request.getGuests());
+        saveOrderGuests(order.getId(), request.getGuests(), request.getContactPhone());
         return toVO(order);
     }
 
@@ -162,7 +171,10 @@ public class OrderService {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
         }
         inventoryService.releaseInventory(
-                order.getRoomTypeId(), order.getCheckInDate(), order.getCheckOutDate());
+                order.getRoomTypeId(),
+                order.getCheckInDate(),
+                order.getCheckOutDate(),
+                resolveRoomCount(order));
         couponService.releaseCoupon(order.getCouponId());
         order.setStatus(OrderStatus.REFUNDED.name());
         order.setRejectReason(reason.trim());
@@ -215,7 +227,10 @@ public class OrderService {
                                 : LocalDateTime.now());
         if (refundResult.refundFromDate() != null) {
             inventoryService.releaseInventory(
-                    order.getRoomTypeId(), refundResult.refundFromDate(), order.getCheckOutDate());
+                    order.getRoomTypeId(),
+                    refundResult.refundFromDate(),
+                    order.getCheckOutDate(),
+                    resolveRoomCount(order));
         }
         if (refundResult.refundAmount().compareTo(order.getTotalAmount()) >= 0) {
             couponService.releaseCoupon(order.getCouponId());
@@ -234,7 +249,7 @@ public class OrderService {
         if (!OrderStatus.canApproveCheckout(order.getStatus())) {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
         }
-        order.setStatus(OrderStatus.CONFIRMED.name());
+        order.setStatus(OrderStatus.PAID.name());
         order.setCheckoutApplyAt(null);
         order.setRefundAmount(null);
         order.setRefundPolicy(null);
@@ -261,12 +276,29 @@ public class OrderService {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
         }
         inventoryService.releaseInventory(
-                order.getRoomTypeId(), order.getCheckInDate(), order.getCheckOutDate());
+                order.getRoomTypeId(),
+                order.getCheckInDate(),
+                order.getCheckOutDate(),
+                resolveRoomCount(order));
         couponService.releaseCoupon(order.getCouponId());
         order.setStatus(OrderStatus.CANCELLED.name());
         order.setCancelledAt(LocalDateTime.now());
         orderMapper.updateById(order);
         return toVO(order);
+    }
+
+    /** 用户删除订单（软删除）：待点评/已点评/已取消/已退款可删，删除后不在我的订单中显示 */
+    @Transactional
+    public void deleteMyOrder(Long orderId) {
+        HotelOrder order = getUserOrder(orderId);
+        if (order.getUserDeletedAt() != null) {
+            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
+        }
+        if (!OrderStatus.canUserDelete(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+        order.setUserDeletedAt(LocalDateTime.now());
+        orderMapper.updateById(order);
     }
 
     public int cancelExpiredPendingOrders() {
@@ -291,16 +323,56 @@ public class OrderService {
         return count;
     }
 
+    /** 离店日当天及之后，将已支付订单自动标记为已完成 */
+    public int autoCompleteDueOrders() {
+        LocalDate today = LocalDate.now();
+        List<HotelOrder> dueOrders =
+                orderMapper.selectList(
+                        new LambdaQueryWrapper<HotelOrder>()
+                                .in(
+                                        HotelOrder::getStatus,
+                                        Arrays.asList(
+                                                OrderStatus.PAID.name(),
+                                                OrderStatus.CONFIRMED.name()))
+                                .le(HotelOrder::getCheckOutDate, today));
+        int count = 0;
+        for (HotelOrder order : dueOrders) {
+            try {
+                transactionTemplate.executeWithoutResult(
+                        status -> systemCompleteDueOrder(order.getId()));
+                count++;
+            } catch (Exception e) {
+                log.warn("Failed to auto-complete order {}", order.getId(), e);
+            }
+        }
+        return count;
+    }
+
     private void systemCancelPendingOrder(Long orderId) {
         HotelOrder order = orderMapper.selectById(orderId);
         if (order == null || !OrderStatus.PENDING_PAYMENT.name().equals(order.getStatus())) {
             return;
         }
         inventoryService.releaseInventory(
-                order.getRoomTypeId(), order.getCheckInDate(), order.getCheckOutDate());
+                order.getRoomTypeId(),
+                order.getCheckInDate(),
+                order.getCheckOutDate(),
+                resolveRoomCount(order));
         couponService.releaseCoupon(order.getCouponId());
         order.setStatus(OrderStatus.CANCELLED.name());
         order.setCancelledAt(LocalDateTime.now());
+        orderMapper.updateById(order);
+    }
+
+    private void systemCompleteDueOrder(Long orderId) {
+        HotelOrder order = orderMapper.selectById(orderId);
+        if (order == null || !OrderStatus.canComplete(order.getStatus())) {
+            return;
+        }
+        if (order.getCheckOutDate() == null || order.getCheckOutDate().isAfter(LocalDate.now())) {
+            return;
+        }
+        order.setStatus(OrderStatus.COMPLETED.name());
         orderMapper.updateById(order);
     }
 
@@ -308,16 +380,66 @@ public class OrderService {
         return toVO(getAccessibleOrder(orderId));
     }
 
+    /**
+     * 用户订单列表。status 支持：
+     * ALL / 空：全部（含已取消、已点评；不含用户已删除）
+     * PENDING_PAYMENT：待支付
+     * UPCOMING：待出行（PAID / CONFIRMED）
+     * PENDING_REVIEW：待点评（COMPLETED 且未评价）
+     * REFUND：退款单（CHECKOUT_PENDING / REFUNDED）
+     */
     public PageResult<OrderVO> listMyOrders(String status, long page, long size) {
         Long userId = SecurityUtils.getCurrentUserId();
-        Page<HotelOrder> orderPage =
-                orderMapper.selectPage(
-                        new Page<>(page, size),
-                        new LambdaQueryWrapper<HotelOrder>()
-                                .eq(HotelOrder::getUserId, userId)
-                                .eq(StringUtils.hasText(status), HotelOrder::getStatus, status)
-                                .orderByDesc(HotelOrder::getCreatedAt));
+        LambdaQueryWrapper<HotelOrder> wrapper =
+                new LambdaQueryWrapper<HotelOrder>()
+                        .eq(HotelOrder::getUserId, userId)
+                        .isNull(HotelOrder::getUserDeletedAt)
+                        .orderByDesc(HotelOrder::getCreatedAt);
+
+        String tab = StringUtils.hasText(status) ? status.trim() : "ALL";
+        switch (tab) {
+            case "ALL", "" -> {
+                // 全部：含已取消支付、已点评等，仅排除用户已删除
+            }
+            case "PENDING_PAYMENT" ->
+                    wrapper.eq(HotelOrder::getStatus, OrderStatus.PENDING_PAYMENT.name());
+            case "UPCOMING" ->
+                    wrapper.in(
+                            HotelOrder::getStatus,
+                            Arrays.asList(
+                                    OrderStatus.PAID.name(), OrderStatus.CONFIRMED.name()));
+            case "PENDING_REVIEW" -> {
+                wrapper.eq(HotelOrder::getStatus, OrderStatus.COMPLETED.name());
+                List<Long> reviewedOrderIds = listReviewedOrderIds(userId);
+                if (!reviewedOrderIds.isEmpty()) {
+                    wrapper.notIn(HotelOrder::getId, reviewedOrderIds);
+                }
+            }
+            case "REFUND" ->
+                    wrapper.in(
+                            HotelOrder::getStatus,
+                            Arrays.asList(
+                                    OrderStatus.CHECKOUT_PENDING.name(),
+                                    OrderStatus.REFUNDED.name(),
+                                    OrderStatus.REFUNDING.name()));
+            default -> wrapper.eq(HotelOrder::getStatus, tab);
+        }
+
+        Page<HotelOrder> orderPage = orderMapper.selectPage(new Page<>(page, size), wrapper);
         return toPage(orderPage);
+    }
+
+    private List<Long> listReviewedOrderIds(Long userId) {
+        return hotelReviewMapper
+                .selectList(
+                        new LambdaQueryWrapper<HotelReview>()
+                                .eq(HotelReview::getUserId, userId)
+                                .select(HotelReview::getOrderId))
+                .stream()
+                .map(HotelReview::getOrderId)
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
     }
 
     public PageResult<OrderVO> listMerchantOrders(
@@ -355,7 +477,10 @@ public class OrderService {
     }
 
     private void validateGuestInfo(CreateOrderRequest request) {
-        if (!request.getGuestCount().equals(request.getGuests().size())) {
+        if (request.getRoomCount() == null || request.getRoomCount() < 1) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST);
+        }
+        if (!request.getRoomCount().equals(request.getGuests().size())) {
             throw new BusinessException(ErrorCode.GUEST_INFO_MISMATCH);
         }
         List<OrderGuestRequest> guests = request.getGuests();
@@ -367,13 +492,18 @@ public class OrderService {
         }
     }
 
-    private void saveOrderGuests(Long orderId, List<OrderGuestRequest> guests) {
+    private void saveOrderGuests(
+            Long orderId, List<OrderGuestRequest> guests, String contactPhone) {
         for (int i = 0; i < guests.size(); i++) {
             OrderGuestRequest guest = guests.get(i);
             OrderGuest entity = new OrderGuest();
             entity.setOrderId(orderId);
             entity.setName(guest.getName().trim());
-            entity.setPhone(guest.getPhone());
+            String phone =
+                    StringUtils.hasText(guest.getPhone())
+                            ? guest.getPhone().trim()
+                            : contactPhone;
+            entity.setPhone(phone);
             entity.setIdCard(
                     StringUtils.hasText(guest.getIdCard()) ? guest.getIdCard().trim() : null);
             entity.setSortOrder(i);
@@ -381,11 +511,20 @@ public class OrderService {
         }
     }
 
+    private int resolveRoomCount(HotelOrder order) {
+        if (order.getRoomCount() != null && order.getRoomCount() > 0) {
+            return order.getRoomCount();
+        }
+        if (order.getGuestCount() != null && order.getGuestCount() > 0) {
+            return order.getGuestCount();
+        }
+        return 1;
+    }
+
     private LambdaQueryWrapper<HotelOrder> buildOrderQuery(
             List<Long> hotelIds, String status, String keyword) {
         LambdaQueryWrapper<HotelOrder> wrapper =
                 new LambdaQueryWrapper<HotelOrder>()
-                        .eq(StringUtils.hasText(status), HotelOrder::getStatus, status)
                         .and(
                                 StringUtils.hasText(keyword),
                                 w ->
@@ -395,6 +534,30 @@ public class OrderService {
                                                 .or()
                                                 .like(HotelOrder::getGuestName, keyword))
                         .orderByDesc(HotelOrder::getCreatedAt);
+        if (StringUtils.hasText(status)) {
+            String tab = status.trim();
+            switch (tab) {
+                case "UPCOMING" ->
+                        wrapper.in(
+                                HotelOrder::getStatus,
+                                Arrays.asList(
+                                        OrderStatus.PAID.name(),
+                                        OrderStatus.CONFIRMED.name(),
+                                        OrderStatus.CHECKED_IN.name(),
+                                        OrderStatus.CHECKOUT_PENDING.name()));
+                case "PENDING_PAYMENT" ->
+                        wrapper.eq(HotelOrder::getStatus, OrderStatus.PENDING_PAYMENT.name());
+                case "COMPLETED" ->
+                        wrapper.eq(HotelOrder::getStatus, OrderStatus.COMPLETED.name());
+                case "REFUNDED" ->
+                        wrapper.in(
+                                HotelOrder::getStatus,
+                                Arrays.asList(
+                                        OrderStatus.REFUNDED.name(),
+                                        OrderStatus.REFUNDING.name()));
+                default -> wrapper.eq(HotelOrder::getStatus, tab);
+            }
+        }
         if (hotelIds != null) {
             wrapper.in(HotelOrder::getHotelId, hotelIds);
         }
@@ -403,7 +566,7 @@ public class OrderService {
 
     private HotelOrder getUserOrder(Long orderId) {
         HotelOrder order = orderMapper.selectById(orderId);
-        if (order == null) {
+        if (order == null || order.getUserDeletedAt() != null) {
             throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
         if (!order.getUserId().equals(SecurityUtils.getCurrentUserId())) {
@@ -432,6 +595,9 @@ public class OrderService {
         }
         LoginUser loginUser = SecurityUtils.getLoginUser();
         if (order.getUserId().equals(loginUser.getUserId())) {
+            if (order.getUserDeletedAt() != null) {
+                throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
+            }
             return order;
         }
         if (UserRole.ADMIN.name().equals(loginUser.getRole())) {
@@ -470,6 +636,7 @@ public class OrderService {
         vo.setCheckOutDate(order.getCheckOutDate());
         vo.setNights(order.getNights());
         vo.setGuestCount(order.getGuestCount());
+        vo.setRoomCount(resolveRoomCount(order));
         vo.setGuestName(order.getGuestName());
         vo.setGuestPhone(SensitiveUtils.maskPhone(order.getGuestPhone()));
         vo.setUnitPrice(order.getUnitPrice());
@@ -484,8 +651,16 @@ public class OrderService {
         vo.setRefundAmount(order.getRefundAmount());
         vo.setRefundPolicy(order.getRefundPolicy());
         vo.setCreatedAt(order.getCreatedAt());
+        vo.setReviewed(isOrderReviewed(order.getId()));
         vo.setGuests(loadGuestVOs(order.getId()));
         return vo;
+    }
+
+    private boolean isOrderReviewed(Long orderId) {
+        Long count =
+                hotelReviewMapper.selectCount(
+                        new LambdaQueryWrapper<HotelReview>().eq(HotelReview::getOrderId, orderId));
+        return count != null && count > 0;
     }
 
     private List<OrderGuestVO> loadGuestVOs(Long orderId) {

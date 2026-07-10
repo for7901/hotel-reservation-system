@@ -12,7 +12,7 @@ public enum ErrorCode {
     INSUFFICIENT_INVENTORY(2002, "库存不足"),
     INVALID_DATE_RANGE(2003, "日期范围无效"),
     GUEST_COUNT_EXCEEDED(2006, "入住人数超过房型最大容纳人数"),
-    GUEST_INFO_MISMATCH(2007, "入住人数与入住人信息数量不一致"),
+    GUEST_INFO_MISMATCH(2007, "预订间数与入住人信息数量不一致"),
     ORDER_NOT_FOUND(2004, "订单不存在"),
     ORDER_STATUS_INVALID(2005, "订单状态不允许此操作"),
     TOO_MANY_REQUESTS(4290, "请求过于频繁，请稍后再试"),
