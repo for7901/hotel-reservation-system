@@ -177,8 +177,7 @@ public class InventoryService {
             Long roomTypeId, LocalDate checkIn, LocalDate checkOut, int roomCount) {
         int quantity = Math.max(roomCount, 1);
         for (LocalDate date : getStayDates(checkIn, checkOut)) {
-            int updated =
-                    inventoryMapper.decrementStock(roomTypeId, date.toString(), quantity);
+            int updated = inventoryMapper.decrementStock(roomTypeId, date.toString(), quantity);
             if (updated == 0) {
                 throw new BusinessException(ErrorCode.INSUFFICIENT_INVENTORY);
             }

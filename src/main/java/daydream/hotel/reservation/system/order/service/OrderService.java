@@ -105,10 +105,7 @@ public class OrderService {
                 inventoryService.calculatePrice(
                         roomType, request.getCheckInDate(), request.getCheckOutDate(), roomCount);
         inventoryService.reserveInventory(
-                roomType.getId(),
-                request.getCheckInDate(),
-                request.getCheckOutDate(),
-                roomCount);
+                roomType.getId(), request.getCheckInDate(), request.getCheckOutDate(), roomCount);
 
         CouponService.DiscountResult discount =
                 couponService.applyDiscount(
@@ -381,12 +378,8 @@ public class OrderService {
     }
 
     /**
-     * 用户订单列表。status 支持：
-     * ALL / 空：全部（含已取消、已点评；不含用户已删除）
-     * PENDING_PAYMENT：待支付
-     * UPCOMING：待出行（PAID / CONFIRMED）
-     * PENDING_REVIEW：待点评（COMPLETED 且未评价）
-     * REFUND：退款单（CHECKOUT_PENDING / REFUNDED）
+     * 用户订单列表。status 支持： ALL / 空：全部（含已取消、已点评；不含用户已删除） PENDING_PAYMENT：待支付 UPCOMING：待出行（PAID /
+     * CONFIRMED） PENDING_REVIEW：待点评（COMPLETED 且未评价） REFUND：退款单（CHECKOUT_PENDING / REFUNDED）
      */
     public PageResult<OrderVO> listMyOrders(String status, long page, long size) {
         Long userId = SecurityUtils.getCurrentUserId();
@@ -406,8 +399,7 @@ public class OrderService {
             case "UPCOMING" ->
                     wrapper.in(
                             HotelOrder::getStatus,
-                            Arrays.asList(
-                                    OrderStatus.PAID.name(), OrderStatus.CONFIRMED.name()));
+                            Arrays.asList(OrderStatus.PAID.name(), OrderStatus.CONFIRMED.name()));
             case "PENDING_REVIEW" -> {
                 wrapper.eq(HotelOrder::getStatus, OrderStatus.COMPLETED.name());
                 List<Long> reviewedOrderIds = listReviewedOrderIds(userId);
@@ -500,9 +492,7 @@ public class OrderService {
             entity.setOrderId(orderId);
             entity.setName(guest.getName().trim());
             String phone =
-                    StringUtils.hasText(guest.getPhone())
-                            ? guest.getPhone().trim()
-                            : contactPhone;
+                    StringUtils.hasText(guest.getPhone()) ? guest.getPhone().trim() : contactPhone;
             entity.setPhone(phone);
             entity.setIdCard(
                     StringUtils.hasText(guest.getIdCard()) ? guest.getIdCard().trim() : null);
@@ -547,14 +537,12 @@ public class OrderService {
                                         OrderStatus.CHECKOUT_PENDING.name()));
                 case "PENDING_PAYMENT" ->
                         wrapper.eq(HotelOrder::getStatus, OrderStatus.PENDING_PAYMENT.name());
-                case "COMPLETED" ->
-                        wrapper.eq(HotelOrder::getStatus, OrderStatus.COMPLETED.name());
+                case "COMPLETED" -> wrapper.eq(HotelOrder::getStatus, OrderStatus.COMPLETED.name());
                 case "REFUNDED" ->
                         wrapper.in(
                                 HotelOrder::getStatus,
                                 Arrays.asList(
-                                        OrderStatus.REFUNDED.name(),
-                                        OrderStatus.REFUNDING.name()));
+                                        OrderStatus.REFUNDED.name(), OrderStatus.REFUNDING.name()));
                 default -> wrapper.eq(HotelOrder::getStatus, tab);
             }
         }

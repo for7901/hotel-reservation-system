@@ -40,7 +40,9 @@ public enum OrderStatus {
                 || REFUNDING.name().equals(status);
     }
 
-    /** @deprecated 支付后无需商家审核入住人，保留兼容旧数据 */
+    /**
+     * @deprecated 支付后无需商家审核入住人，保留兼容旧数据
+     */
     @Deprecated
     public static boolean canReviewGuests(String status) {
         return PAID.name().equals(status);

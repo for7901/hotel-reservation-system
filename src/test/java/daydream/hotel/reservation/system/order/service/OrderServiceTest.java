@@ -110,7 +110,8 @@ class OrderServiceTest {
     void createOrderShouldReserveInventoryAndPersistOrder() {
         when(hotelMapper.selectById(1L)).thenReturn(hotel);
         when(roomTypeMapper.selectOne(any())).thenReturn(roomType);
-        when(inventoryService.calculatePrice(any(), any(), any(), org.mockito.ArgumentMatchers.eq(1)))
+        when(inventoryService.calculatePrice(
+                        any(), any(), any(), org.mockito.ArgumentMatchers.eq(1)))
                 .thenReturn(
                         new InventoryService.PriceSummary(
                                 1, new BigDecimal("299.00"), new BigDecimal("299.00"), 5));
@@ -122,8 +123,7 @@ class OrderServiceTest {
         OrderVO vo = orderService.createOrder(request);
 
         verify(inventoryService)
-                .reserveInventory(
-                        2L, request.getCheckInDate(), request.getCheckOutDate(), 1);
+                .reserveInventory(2L, request.getCheckInDate(), request.getCheckOutDate(), 1);
         verify(orderGuestMapper).insert(org.mockito.ArgumentMatchers.<OrderGuest>any());
 
         ArgumentCaptor<HotelOrder> captor = ArgumentCaptor.forClass(HotelOrder.class);
