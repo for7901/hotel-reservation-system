@@ -52,3 +52,6 @@ user-web/dist/
 .experiment1_work/
 __pycache__/
 *.pyc
+
+### 本机文档生成脚本（不属于项目代码） ###
+scripts/*.py
