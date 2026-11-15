@@ -74,7 +74,7 @@ onMounted(loadData)
         </template>
       </el-table-column>
       <template #empty>
-        <el-empty description="暂无库存，请保存以初始化" />
+        <el-empty description="暂无库存数据，请调整起始日期后重试" />
       </template>
     </el-table>
   </el-card>

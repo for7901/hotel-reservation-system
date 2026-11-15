@@ -116,7 +116,7 @@ const selectedLocationName = () => {
     </van-nav-bar>
     <van-swipe v-if="banners.length" class="banner-swipe" :autoplay="4000" indicator-color="#fff">
       <van-swipe-item v-for="item in banners" :key="item.id" @click="openBanner(item.linkUrl)">
-        <img :src="item.imageUrl" class="banner-img" :alt="item.title" />
+        <img :src="item.imageUrl" class="banner-img" :alt="item.title" referrerpolicy="no-referrer" />
         <div class="banner-title">{{ item.title }}</div>
       </van-swipe-item>
     </van-swipe>

@@ -20,6 +20,12 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+/**
+ * Security + JJWT 鉴权配置。
+ *
+ * <p>无状态 JWT：请求经 {@link JwtAuthenticationFilter} 解析 Token；公开接口放行，其余需登录。 方法级权限由
+ * {@code @PreAuthorize} 等注解控制。
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -39,10 +45,12 @@ public class SecurityConfig {
         this.accessDeniedHandler = accessDeniedHandler;
     }
 
+    /** 安全过滤链：CORS、无 Session、白名单、JWT 过滤器。 */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // 前后端分离：不使用服务端 Session，鉴权依赖 JWT
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(
@@ -51,14 +59,18 @@ public class SecurityConfig {
                                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(
                         auth ->
-                                auth.requestMatchers(
+                                auth
+                                        // 健康检查、登录注册
+                                        .requestMatchers(
                                                 "/health",
                                                 "/api/health",
                                                 "/auth/**",
                                                 "/api/auth/**")
                                         .permitAll()
+                                        // 酒店浏览（公开）
                                         .requestMatchers("/hotels/**", "/api/hotels/**")
                                         .permitAll()
+                                        // Banner / 评价只读公开
                                         .requestMatchers(
                                                 HttpMethod.GET,
                                                 "/banners",
@@ -71,6 +83,7 @@ public class SecurityConfig {
                                                 "/reviews/hotels/**",
                                                 "/api/reviews/hotels/**")
                                         .permitAll()
+                                        // Swagger / OpenAPI 文档
                                         .requestMatchers(
                                                 "/v3/api-docs/**",
                                                 "/api/v3/api-docs/**",
@@ -81,16 +94,19 @@ public class SecurityConfig {
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())
+                // 在用户名密码过滤器之前解析 Authorization: Bearer <token>
                 .addFilterBefore(
                         jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
+    /** 密码加密（BCrypt），注册与登录校验共用。 */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /** 允许本地前端与部署域名跨域携带凭证访问。 */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();

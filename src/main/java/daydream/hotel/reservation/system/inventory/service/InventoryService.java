@@ -18,12 +18,17 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class InventoryService {
+
+    public static final int DEFAULT_AVAILABLE_ROOMS = 10;
+    public static final int DEFAULT_INVENTORY_DAYS = 60;
 
     private final InventoryCalendarMapper inventoryMapper;
     private final RoomTypeMapper roomTypeMapper;
@@ -43,22 +48,89 @@ public class InventoryService {
 
     public List<InventoryItemVO> listInventory(
             Long hotelId, Long roomTypeId, LocalDate startDate, LocalDate endDate) {
-        validateRoomType(hotelId, roomTypeId);
-        return inventoryMapper
+        RoomType roomType = getRoomType(hotelId, roomTypeId);
+        Map<LocalDate, InventoryItemVO> byDate = new LinkedHashMap<>();
+        inventoryMapper
                 .selectList(
                         new LambdaQueryWrapper<InventoryCalendar>()
                                 .eq(InventoryCalendar::getRoomTypeId, roomTypeId)
                                 .ge(InventoryCalendar::getInvDate, startDate)
                                 .lt(InventoryCalendar::getInvDate, endDate)
                                 .orderByAsc(InventoryCalendar::getInvDate))
-                .stream()
-                .map(this::toVO)
-                .toList();
+                .forEach(item -> byDate.put(item.getInvDate(), toVO(item)));
+
+        List<InventoryItemVO> result = new ArrayList<>();
+        LocalDate current = startDate;
+        while (current.isBefore(endDate)) {
+            InventoryItemVO item = byDate.get(current);
+            if (item == null) {
+                item = defaultInventoryItem(current, roomType.getBasePrice());
+            }
+            result.add(item);
+            current = current.plusDays(1);
+        }
+        return result;
+    }
+
+    @Transactional
+    public int ensureDefaultInventory(Long roomTypeId, LocalDate startDate, int days) {
+        return ensureDefaultInventory(roomTypeId, startDate, days, DEFAULT_AVAILABLE_ROOMS);
+    }
+
+    @Transactional
+    public int ensureDefaultInventory(
+            Long roomTypeId, LocalDate startDate, int days, int defaultAvailableRooms) {
+        RoomType roomType = roomTypeMapper.selectById(roomTypeId);
+        if (roomType == null || roomType.getStatus() == null || roomType.getStatus() != 1) {
+            return 0;
+        }
+        int quantity = Math.max(defaultAvailableRooms, 0);
+        int created = 0;
+        for (int i = 0; i < days; i++) {
+            LocalDate date = startDate.plusDays(i);
+            InventoryCalendar existing =
+                    inventoryMapper.selectOne(
+                            new LambdaQueryWrapper<InventoryCalendar>()
+                                    .eq(InventoryCalendar::getRoomTypeId, roomTypeId)
+                                    .eq(InventoryCalendar::getInvDate, date));
+            if (existing != null) {
+                continue;
+            }
+            InventoryCalendar calendar = new InventoryCalendar();
+            calendar.setRoomTypeId(roomTypeId);
+            calendar.setInvDate(date);
+            calendar.setPrice(roomType.getBasePrice());
+            calendar.setAvailableRooms(quantity);
+            inventoryMapper.insert(calendar);
+            created++;
+        }
+        if (created > 0) {
+            hotelService.refreshMinPrice(roomType.getHotelId());
+        }
+        return created;
+    }
+
+    @Transactional
+    public int ensureDefaultInventoryForAllRoomTypes(int days) {
+        return ensureDefaultInventoryForAllRoomTypes(days, DEFAULT_AVAILABLE_ROOMS);
+    }
+
+    @Transactional
+    public int ensureDefaultInventoryForAllRoomTypes(int days, int defaultAvailableRooms) {
+        List<RoomType> roomTypes =
+                roomTypeMapper.selectList(
+                        new LambdaQueryWrapper<RoomType>().eq(RoomType::getStatus, 1));
+        LocalDate today = LocalDate.now();
+        int total = 0;
+        for (RoomType roomType : roomTypes) {
+            total += ensureDefaultInventory(roomType.getId(), today, days, defaultAvailableRooms);
+        }
+        return total;
     }
 
     @Transactional
     public void saveInventory(Long hotelId, Long roomTypeId, List<InventoryItemRequest> items) {
-        validateRoomType(hotelId, roomTypeId);
+        getRoomType(hotelId, roomTypeId);
         for (InventoryItemRequest item : items) {
             InventoryCalendar existing =
                     inventoryMapper.selectOne(
@@ -208,7 +280,7 @@ public class InventoryService {
         return dates;
     }
 
-    private void validateRoomType(Long hotelId, Long roomTypeId) {
+    private RoomType getRoomType(Long hotelId, Long roomTypeId) {
         RoomType roomType =
                 roomTypeMapper.selectOne(
                         new LambdaQueryWrapper<RoomType>()
@@ -217,6 +289,15 @@ public class InventoryService {
         if (roomType == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
+        return roomType;
+    }
+
+    private InventoryItemVO defaultInventoryItem(LocalDate date, BigDecimal basePrice) {
+        InventoryItemVO vo = new InventoryItemVO();
+        vo.setInvDate(date);
+        vo.setPrice(basePrice);
+        vo.setAvailableRooms(DEFAULT_AVAILABLE_ROOMS);
+        return vo;
     }
 
     private InventoryItemVO toVO(InventoryCalendar item) {

@@ -2,6 +2,15 @@ package daydream.hotel.reservation.system.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * 业务可调参数，对应 {@code application.yml} 中 {@code app.*}。
+ *
+ * <ul>
+ *   <li>{@code cache} — Redis 缓存 TTL
+ *   <li>{@code order} — 支付超时与巡检间隔
+ *   <li>{@code rateLimit} — 登录限流阈值
+ * </ul>
+ */
 @ConfigurationProperties(prefix = "app")
 public class AppProperties {
 
@@ -33,6 +42,7 @@ public class AppProperties {
         this.rateLimit = rateLimit;
     }
 
+    /** 缓存过期时间（秒）。 */
     public static class Cache {
         private int bannerTtlSeconds = 600;
         private int cityTtlSeconds = 1800;
@@ -54,6 +64,7 @@ public class AppProperties {
         }
     }
 
+    /** 订单超时相关。 */
     public static class Order {
         private int paymentTimeoutMinutes = 30;
         private long timeoutCheckIntervalMs = 60_000L;
@@ -75,6 +86,7 @@ public class AppProperties {
         }
     }
 
+    /** 登录接口限流：窗口内最大尝试次数。 */
     public static class RateLimit {
         private int loginMaxAttempts = 5;
         private int loginWindowSeconds = 60;

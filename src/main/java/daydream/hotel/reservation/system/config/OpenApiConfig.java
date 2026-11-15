@@ -9,6 +9,11 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * SpringDoc / OpenAPI 文档配置。
+ *
+ * <p>Swagger UI 中可填写 Bearer JWT，便于调试需登录的接口。
+ */
 @Configuration
 public class OpenApiConfig {
 

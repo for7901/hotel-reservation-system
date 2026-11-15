@@ -1,11 +1,15 @@
 package daydream.hotel.reservation.system.config;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import daydream.hotel.reservation.system.banner.entity.Banner;
 import daydream.hotel.reservation.system.banner.mapper.BannerMapper;
+import daydream.hotel.reservation.system.common.cache.CacheKeys;
+import daydream.hotel.reservation.system.common.cache.CacheService;
 import daydream.hotel.reservation.system.coupon.entity.Coupon;
 import daydream.hotel.reservation.system.coupon.mapper.CouponMapper;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -14,25 +18,36 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("dev")
+@Profile("dev & !opengauss")
 @Order(4)
 public class DevEngagementDataInitializer implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DevEngagementDataInitializer.class);
 
+    private static final String[] BANNER_IMAGES = {
+        "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&h=320&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&h=320&fit=crop&q=80"
+    };
+
     private final BannerMapper bannerMapper;
     private final CouponMapper couponMapper;
+    private final CacheService cacheService;
 
-    public DevEngagementDataInitializer(BannerMapper bannerMapper, CouponMapper couponMapper) {
+    public DevEngagementDataInitializer(
+            BannerMapper bannerMapper, CouponMapper couponMapper, CacheService cacheService) {
         this.bannerMapper = bannerMapper;
         this.couponMapper = couponMapper;
+        this.cacheService = cacheService;
     }
 
     @Override
     public void run(String... args) {
+        if (fixBrokenBannerImages() > 0) {
+            log.info("Fixed broken banner image URLs");
+        }
         if (bannerMapper.selectCount(null) == 0) {
-            createBanner("春日出行季", "https://picsum.photos/800/320?random=1", "/", 1);
-            createBanner("周末特惠酒店", "https://picsum.photos/800/320?random=2", "/hotels", 2);
+            createBanner("春日出行季", BANNER_IMAGES[0], "/", 1);
+            createBanner("周末特惠酒店", BANNER_IMAGES[1], "/hotels", 2);
             log.info("Seeded demo banners");
         }
         if (couponMapper.selectCount(null) == 0) {
@@ -61,6 +76,23 @@ public class DevEngagementDataInitializer implements CommandLineRunner {
             couponMapper.insert(coupon2);
             log.info("Seeded demo coupons");
         }
+    }
+
+    private int fixBrokenBannerImages() {
+        List<Banner> broken =
+                bannerMapper.selectList(
+                        new LambdaQueryWrapper<Banner>()
+                                .like(Banner::getImageUrl, "picsum.photos"));
+        if (broken.isEmpty()) {
+            return 0;
+        }
+        for (Banner banner : broken) {
+            int index = Math.max(0, Math.min(banner.getSortOrder() - 1, BANNER_IMAGES.length - 1));
+            banner.setImageUrl(BANNER_IMAGES[index]);
+            bannerMapper.updateById(banner);
+        }
+        cacheService.evict(CacheKeys.BANNER_ACTIVE);
+        return broken.size();
     }
 
     private void createBanner(String title, String imageUrl, String linkUrl, int sort) {

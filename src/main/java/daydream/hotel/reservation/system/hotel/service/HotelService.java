@@ -32,15 +32,18 @@ import daydream.hotel.reservation.system.hotel.mapper.HotelFacilityMapper;
 import daydream.hotel.reservation.system.hotel.mapper.HotelMapper;
 import daydream.hotel.reservation.system.hotel.mapper.ProvinceMapper;
 import daydream.hotel.reservation.system.hotel.mapper.RoomTypeMapper;
+import daydream.hotel.reservation.system.inventory.service.InventoryService;
 import daydream.hotel.reservation.system.user.entity.User;
 import daydream.hotel.reservation.system.user.enums.UserRole;
 import daydream.hotel.reservation.system.user.mapper.UserMapper;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -57,6 +60,7 @@ public class HotelService {
     private final AuditLogService auditLogService;
     private final CacheService cacheService;
     private final AppProperties appProperties;
+    private final InventoryService inventoryService;
 
     public HotelService(
             ProvinceMapper provinceMapper,
@@ -67,7 +71,8 @@ public class HotelService {
             UserMapper userMapper,
             AuditLogService auditLogService,
             CacheService cacheService,
-            AppProperties appProperties) {
+            AppProperties appProperties,
+            @Lazy InventoryService inventoryService) {
         this.provinceMapper = provinceMapper;
         this.cityMapper = cityMapper;
         this.hotelMapper = hotelMapper;
@@ -77,6 +82,7 @@ public class HotelService {
         this.auditLogService = auditLogService;
         this.cacheService = cacheService;
         this.appProperties = appProperties;
+        this.inventoryService = inventoryService;
     }
 
     public List<ProvinceVO> listProvinces() {
@@ -302,6 +308,11 @@ public class HotelService {
         applyRoomTypeFields(roomType, request);
         roomType.setStatus(1);
         roomTypeMapper.insert(roomType);
+        inventoryService.ensureDefaultInventory(
+                roomType.getId(),
+                LocalDate.now(),
+                InventoryService.DEFAULT_INVENTORY_DAYS,
+                InventoryService.DEFAULT_AVAILABLE_ROOMS);
         refreshMinPrice(hotelId);
         return toRoomTypeVO(roomType);
     }

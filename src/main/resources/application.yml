@@ -1,15 +1,19 @@
+#Spring配置
 spring:
   profiles:
+    #开发环境
     active: dev
   application:
+    #应用名称
     name: hotel-reservation-system
-
+#服务器配置
 server:
   port: 8080
   servlet:
     context-path: /api
 
 mybatis-plus:
+  
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl

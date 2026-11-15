@@ -14,6 +14,7 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
+/** 未登录访问受保护接口时的入口：返回统一 JSON（401），而非默认 HTML 登录页。 */
 @Component
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
@@ -39,6 +40,7 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
     }
 }
 
+/** 已登录但权限不足时返回统一 JSON（403）。 */
 @Component
 class RestAccessDeniedHandler implements AccessDeniedHandler {
 
