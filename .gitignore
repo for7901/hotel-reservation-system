@@ -46,3 +46,9 @@ admin-web/node_modules/
 admin-web/dist/
 user-web/node_modules/
 user-web/dist/
+
+### 临时文件 / 生成产物 ###
+.dsh-office-*/
+.experiment1_work/
+__pycache__/
+*.pyc
