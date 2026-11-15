@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import daydream.hotel.reservation.system.audit.service.AuditLogService;
 import daydream.hotel.reservation.system.auth.security.SecurityUtils;
+import daydream.hotel.reservation.system.auth.security.TokenVersionStore;
 import daydream.hotel.reservation.system.common.exception.BusinessException;
 import daydream.hotel.reservation.system.common.exception.ErrorCode;
 import daydream.hotel.reservation.system.common.result.PageResult;
@@ -13,6 +14,7 @@ import daydream.hotel.reservation.system.user.dto.ChangePasswordRequest;
 import daydream.hotel.reservation.system.user.dto.UpdateProfileRequest;
 import daydream.hotel.reservation.system.user.dto.UserProfileVO;
 import daydream.hotel.reservation.system.user.entity.User;
+import daydream.hotel.reservation.system.user.enums.UserStatus;
 import daydream.hotel.reservation.system.user.mapper.UserMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,14 +27,17 @@ public class UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
+    private final TokenVersionStore tokenVersionStore;
 
     public UserService(
             UserMapper userMapper,
             PasswordEncoder passwordEncoder,
-            AuditLogService auditLogService) {
+            AuditLogService auditLogService,
+            TokenVersionStore tokenVersionStore) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.auditLogService = auditLogService;
+        this.tokenVersionStore = tokenVersionStore;
     }
 
     public UserProfileVO getCurrentProfile() {
@@ -60,6 +65,8 @@ public class UserService {
         }
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userMapper.updateById(user);
+        // 改密码后强制所有设备重新登录：版本号 +1，旧 Token 下一个请求即失效
+        tokenVersionStore.revokeAll(user.getId());
     }
 
     public PageResult<AdminUserVO> listUsers(
@@ -92,6 +99,10 @@ public class UserService {
         }
         user.setStatus(status);
         userMapper.updateById(user);
+        // 禁用立即生效：不等 JWT 自然过期（重新启用时无需处理，旧 Token 早已失效）
+        if (status == null || status != UserStatus.ACTIVE.getValue()) {
+            tokenVersionStore.revokeAll(user.getId());
+        }
         auditLogService.record(
                 "USER_STATUS",
                 "USER",

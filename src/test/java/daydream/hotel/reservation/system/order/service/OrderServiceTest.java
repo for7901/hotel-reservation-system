@@ -73,9 +73,7 @@ class OrderServiceTest {
         SecurityContextHolder.getContext()
                 .setAuthentication(
                         new UsernamePasswordAuthenticationToken(
-                                new LoginUser(100L, "13900001111", "pwd", "USER", true),
-                                null,
-                                null));
+                                new LoginUser(100L, "13900001111", "USER", true), null, null));
 
         OrderGuestRequest guest = new OrderGuestRequest();
         guest.setName("张三");

@@ -5,6 +5,7 @@ import daydream.hotel.reservation.system.auth.dto.LoginRequest;
 import daydream.hotel.reservation.system.auth.dto.LoginResponse;
 import daydream.hotel.reservation.system.auth.dto.RegisterRequest;
 import daydream.hotel.reservation.system.auth.security.JwtTokenProvider;
+import daydream.hotel.reservation.system.auth.security.TokenVersionStore;
 import daydream.hotel.reservation.system.common.exception.BusinessException;
 import daydream.hotel.reservation.system.common.exception.ErrorCode;
 import daydream.hotel.reservation.system.common.util.SensitiveUtils;
@@ -23,14 +24,17 @@ public class AuthService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final TokenVersionStore tokenVersionStore;
 
     public AuthService(
             UserMapper userMapper,
             PasswordEncoder passwordEncoder,
-            JwtTokenProvider jwtTokenProvider) {
+            JwtTokenProvider jwtTokenProvider,
+            TokenVersionStore tokenVersionStore) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.tokenVersionStore = tokenVersionStore;
     }
 
     @Transactional
@@ -70,9 +74,15 @@ public class AuthService {
     }
 
     private LoginResponse buildLoginResponse(User user) {
+        // 版本号随 Token 一起下发；被 revokeAll 提升过的版本会立刻让旧 Token 失效
+        Long tokenVersion = tokenVersionStore.currentVersion(user.getId());
         LoginResponse response = new LoginResponse();
         response.setToken(
-                jwtTokenProvider.generateToken(user.getId(), user.getPhone(), user.getRole()));
+                jwtTokenProvider.generateToken(
+                        user.getId(),
+                        user.getPhone(),
+                        user.getRole(),
+                        tokenVersion == null ? 0L : tokenVersion));
         response.setUserId(user.getId());
         response.setPhone(SensitiveUtils.maskPhone(user.getPhone()));
         response.setNickname(user.getNickname());
